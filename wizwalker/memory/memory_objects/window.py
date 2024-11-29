@@ -370,7 +370,7 @@ class SpellListControl(Window):
         raise NotImplementedError()
 
     async def spell_entries(self) -> List[SpellListControlSpellEntry]:
-        return await self.read_inlined_vector(0x278, 0x20, SpellListControlSpellEntry)
+        return await self.read_inlined_vector(0x280, 0x16, SpellListControlSpellEntry)
 
     async def card_size_horizontal(self) -> int:
         return await self.read_value_from_offset(0x2C4, Primitive.uint32)
@@ -379,10 +379,10 @@ class SpellListControl(Window):
         return await self.read_value_from_offset(0x2C8, Primitive.uint32)
 
     async def start_index(self) -> int:
-        return await self.read_value_from_offset(0x2C0, Primitive.uint32)
+        return await self.read_value_from_offset(0x2C8, Primitive.uint32)
 
     async def write_start_index(self, start_index: int):
-        return await self.write_value_to_offset(0x2C0, start_index, Primitive.uint32)
+        return await self.write_value_to_offset(0x2C8, start_index, Primitive.uint32)
 
 
 class DynamicWindow(DynamicMemoryObject, Window):
