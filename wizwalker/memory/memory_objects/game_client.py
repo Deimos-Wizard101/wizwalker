@@ -26,7 +26,7 @@ class GameClient(MemoryObject):
             rb"\x20\x02\x00\x48\x8B\x07\x33\xD2\x48\x8B\xCF",
             3,
             "elastic_camera_controller",
-            0x21ff8
+            0x22000
         )
 
         addr = await self.read_value_from_offset(offset, Primitive.uint64)
@@ -42,7 +42,7 @@ class GameClient(MemoryObject):
             rb"\x41\xB8\x01\x00\x00\x00\x48\x8B\xCB\x48\x3B\xFA\x75",
             3,
             "free_camera_controller",
-            0x22008
+            0x22010
         )
 
         addr = await self.read_value_from_offset(offset, Primitive.uint64)
@@ -62,7 +62,7 @@ class GameClient(MemoryObject):
             rb"....\x90\x48\x8B\x4C\x24",
             3,
             "selected_camera_controller",
-            0x22028
+            0x22030
         )
 
         addr = await self.read_value_from_offset(offset, Primitive.uint64)
@@ -85,7 +85,7 @@ class GameClient(MemoryObject):
             rb"....\x90\x48\x8B\x4C\x24",
             3,
             "selected_camera_controller",
-            0x22028
+            0x22030
         )
 
         await self.write_value_to_offset(offset, selected_camera_controller, Primitive.uint64)
@@ -100,7 +100,7 @@ class GameClient(MemoryObject):
             rb"\x55\xE0\x48\x8B\xCB\xE8",
             3,
             "is_freecam",
-            0x22040
+            0x22048
         )
         return await self.read_value_from_offset(offset, Primitive.bool)
 
@@ -114,7 +114,7 @@ class GameClient(MemoryObject):
             rb"\x55\xE0\x48\x8B\xCB\xE8",
             3,
             "is_freecam",
-            0x22040
+            0x22048
         )
         await self.write_value_to_offset(offset, is_freecam, Primitive.bool)
 
@@ -247,7 +247,7 @@ class GameClient(MemoryObject):
         return DynamicGamebryoPresenter(self.hook_handler, addr)
 
     async def fishing_manager(self) -> FishingManager:
-        addr = await self.read_value_from_offset(0x22ed8, Primitive.uint64)
+        addr = await self.read_value_from_offset(0x22ee0, Primitive.uint64)
         return FishingManager(self.hook_handler, addr)
 
 class CurrentGameClient(GameClient):
@@ -257,7 +257,7 @@ class CurrentGameClient(GameClient):
         if self._base_address is not None:
             return self._base_address
 
-        addr = await self.pattern_scan(rb"\x48\x8B.....\x48\x8B\xD9\x80\xB8\x45")
+        addr = await self.pattern_scan(rb"\x48\x8b.....\x48\x8b.\x80\xb8....\x00\x74.\x4c\x8b")
         offset = await self.read_typed(addr + 3, Primitive.int32)
 
         self._base_address = await self.read_typed(addr + 7 + offset, Primitive.uint64)
