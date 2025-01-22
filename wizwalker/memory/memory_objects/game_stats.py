@@ -783,6 +783,12 @@ class GameStats(PropertyClass):
     async def write_mail_sent_today(self, mail_sent_today: int):
         await self.write_value_to_offset(1096, mail_sent_today, Primitive.uint8)
 
+    async def secondary_school(self) -> int:
+        return await self.read_value_from_offset(1100, Primitive.int32)
+
+    async def write_secondary_school(self, secondary_school: int):
+        return await self.write_value_to_offset(1100, secondary_school, Primitive.int32)
+
 class CurrentGameStats(GameStats):
     async def read_base_address(self) -> int:
         return await self.hook_handler.read_current_player_stat_base()
