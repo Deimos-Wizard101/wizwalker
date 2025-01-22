@@ -9,6 +9,7 @@ from .client_zone import DynamicClientZone
 from .core_object import CoreObject
 from .inventory_behavior import ClientWizInventoryBehavior
 from .equipment_behavior import ClientWizEquipmentBehavior
+from .behavior_template import NPCBehaviorTemplate
 
 
 class ClientObject(CoreObject):
@@ -149,6 +150,13 @@ class ClientObject(CoreObject):
             return None
 
         return DynamicGameStats(self.hook_handler, addr)
+    
+    async def fetch_npc_behavior_template(self) -> NPCBehaviorTemplate | None:
+        if behavior := await self.search_behavior_by_name("NPCBehavior"):
+            templ = await behavior.behavior_template()
+            return NPCBehaviorTemplate(templ.hook_handler, await templ.read_base_address())
+        return None
+
 
 
 class CurrentClientObject(ClientObject):

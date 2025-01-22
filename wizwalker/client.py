@@ -431,21 +431,19 @@ class Client:
         while await self.is_loading():
             await asyncio.sleep(sleep_time)
 
-    async def current_energy(self) -> int:
+    async def current_energy(self) -> int | None:
         """
         Client's current energy
-        energy globe must be visible to use
         """
-        maybe_energy_text = await self.root_window.get_windows_with_name("textEnergy")
-
-        if not maybe_energy_text:
-            # TODO: replace error
-            raise ValueError("Energy globe not on screen")
-
-        text = await maybe_energy_text[0].maybe_text()
-        text = text.replace("<center>", "")
-        text = text.replace("</center>", "")
-        return int(text)
+        if (behavior := await self.client_object.search_behavior_by_name("PetOwnerBehavior")) is not None:
+            return await behavior.read_value_from_offset(132, Primitive.int32)
+        
+        if (maybe_energy_text := await self.root_window.get_windows_with_name("textEnergy")) is not None:
+            energy_text = await maybe_energy_text[0].maybe_text()		
+            energy_text = energy_text.replace("<center>", "").replace("</center>", "")
+            return int(energy_text)
+        
+        return None
 
     def login(self, username: str, password: str):
         """

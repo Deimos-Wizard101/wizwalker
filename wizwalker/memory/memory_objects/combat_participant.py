@@ -31,10 +31,7 @@ class CombatParticipant(PropertyClass):
         ent = await self.fetch_entity()
         if ent is None:
             return None
-        if behavior := await ent.search_behavior_by_name("NPCBehavior"):
-            templ = await behavior.behavior_template()
-            return NPCBehaviorTemplate(templ.hook_handler, await templ.read_base_address())
-        return None
+        return await ent.fetch_npc_behavior_template()
 
 
     async def owner_id_full(self) -> int:

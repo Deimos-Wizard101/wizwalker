@@ -938,4 +938,4 @@ def make_string_id(x: str) -> int:
         hash ^= sign_extend(val << shift)
         if shift > 24:
             hash ^= sign_extend(val >> (32 - shift))
-    return hash & 0xFFFF_FFFF
+    return abs(hash) & 0xFFFF_FFFF

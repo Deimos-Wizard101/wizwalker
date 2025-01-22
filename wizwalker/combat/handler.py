@@ -195,8 +195,7 @@ class CombatHandler:
         Keyword Args:
             check_enchanted: None -> don't check enchanted; False -> non-enchanted; True -> enchanted
         """
-
-        async def _pred(card):
+        async def _pred(card: CombatCard):
             if check_enchanted is True:
                 if not await card.is_enchanted():
                     return False
@@ -205,7 +204,7 @@ class CombatHandler:
                 if await card.is_enchanted():
                     return False
 
-            if await card.type_name() != "AOE":
+            if await card.type_name() not in ("AOE", "Steal"):
                 return False
 
             effects = await card.get_spell_effects()
@@ -226,6 +225,7 @@ class CombatHandler:
                         EffectTarget.enemy_team_all_at_once,
                     ):
                         return True
+            return False
 
         return await self.get_cards_with_predicate(_pred)
 
