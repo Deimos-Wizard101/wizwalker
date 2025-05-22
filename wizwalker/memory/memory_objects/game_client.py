@@ -26,7 +26,7 @@ class GameClient(MemoryObject):
             rb"\x20\x02\x00\x48\x8B\x07\x33\xD2\x48\x8B\xCF",
             3,
             "elastic_camera_controller",
-            0x22028
+            0x221f8
         )
 
         addr = await self.read_value_from_offset(offset, Primitive.uint64)
@@ -42,7 +42,7 @@ class GameClient(MemoryObject):
             rb"\x41\xB8\x01\x00\x00\x00\x48\x8B\xCB\x48\x3B\xFA\x75",
             3,
             "free_camera_controller",
-            0x22038
+            0x22208
         )
 
         addr = await self.read_value_from_offset(offset, Primitive.uint64)
@@ -62,7 +62,7 @@ class GameClient(MemoryObject):
             rb"....\x90\x48\x8B\x4C\x24",
             3,
             "selected_camera_controller",
-            0x22058
+            0x22228
         )
 
         addr = await self.read_value_from_offset(offset, Primitive.uint64)
@@ -85,7 +85,7 @@ class GameClient(MemoryObject):
             rb"....\x90\x48\x8B\x4C\x24",
             3,
             "selected_camera_controller",
-            0x22058
+            0x22228
         )
 
         await self.write_value_to_offset(offset, selected_camera_controller, Primitive.uint64)
@@ -100,7 +100,7 @@ class GameClient(MemoryObject):
             rb"\x55\xE0\x48\x8B\xCB\xE8",
             3,
             "is_freecam",
-            0x22070
+            0x22240
         )
         return await self.read_value_from_offset(offset, Primitive.bool)
 
@@ -114,7 +114,7 @@ class GameClient(MemoryObject):
             rb"\x55\xE0\x48\x8B\xCB\xE8",
             3,
             "is_freecam",
-            0x22070
+            0x22240
         )
         await self.write_value_to_offset(offset, is_freecam, Primitive.bool)
 
