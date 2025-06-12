@@ -29,3 +29,4 @@ wizwalker = "wizwalker.__main__:main"
 [build-system]
 requires = ["poetry>=1.8.3"]
 build-backend = "poetry.masonry.api"
+
