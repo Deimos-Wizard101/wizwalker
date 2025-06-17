@@ -27,5 +27,5 @@ pdoc = "^14.5.0"
 wizwalker = "wizwalker.__main__:main"
 
 [build-system]
-requires = ["poetry-core>=1.8.0"]  # 1.8+ implements PEP 660
-build-backend = "poetry.core.masonry.api"
+requires = ["poetry>=1.8.3"]
+build-backend = "poetry.masonry.api"
