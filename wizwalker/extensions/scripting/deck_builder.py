@@ -713,7 +713,6 @@ class DeckBuilder:
                         card_count+=1
                     if card_count >= item[1]:
                         break
-            print(len(cards), total)
             if len(cards)==total:
                 return
             else:
