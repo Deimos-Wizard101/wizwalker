@@ -94,10 +94,10 @@ class MemoryObject(MemoryReader):
         string_len *= 2
 
         # wide strings larger than 8 bytes are pointers
-        if string_len >= 8:
-            string_address = await self.read_typed(address, Primitive.int64)
-        else:
-            string_address = address
+        #if string_len >= 8:
+        string_address = await self.read_typed(address, Primitive.int64)
+        #else:
+        #    string_address = address
 
         try:
             return (await self.read_bytes(string_address, string_len)).decode(encoding)
