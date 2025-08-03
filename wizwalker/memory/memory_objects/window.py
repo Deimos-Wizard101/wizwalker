@@ -166,7 +166,23 @@ class Window(PropertyClass):
     async def maybe_text(self, *, check_type: bool = False) -> str:
         # TODO: see if all types with .text have Control prefix
         #  and if so check that they have it
-        return await self.read_wide_string_from_offset(584)
+        base_address = await self.read_base_address() + 584
+        string_len = await self.read_typed(base_address + 16, Primitive.int32)
+        if string_len == 0:
+            return ""
+
+        # wide chars take 2 bytes
+        string_len *= 2
+
+        # this is a guess, but it seems like its awlways a pointer regardless of length
+
+        string_address = await self.read_typed(base_address, Primitive.int64)
+
+        try:
+            return (await self.read_bytes(string_address, string_len)).decode("utf-16")
+        except UnicodeDecodeError:
+            return ""
+        #return await self.read_wide_string_from_offset(584)
 
     async def write_maybe_text(self, text: str):
         """
