@@ -850,8 +850,7 @@ class DeckBuilder:
             if await template.name() == name:
                 calcuated_copies = calcuated_copies + 1
         if number_of_copies != calcuated_copies:
-            raise ValueError(f"Trying to delete more '{
-                             name}' spells than are in the deck")
+            raise ValueError(f"Trying to delete more '{name}' spells than are in the deck")
         index = list_of_spell_names.index(name)
         deck_rect = await self.get_deck_list_rectangle()
         divided_deck_rect = self.divide_rectangle(deck_rect, columns=8, rows=8)
