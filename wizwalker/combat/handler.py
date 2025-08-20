@@ -418,7 +418,7 @@ class CombatHandler:
 
     async def flee_button(self):
         """
-        Click the free button
+        Click the flee button
         """
         pos_done_window = await self.client.root_window.get_windows_with_name(
             "DoneWindow"
