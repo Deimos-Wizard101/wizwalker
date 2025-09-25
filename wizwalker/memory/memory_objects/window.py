@@ -261,11 +261,11 @@ class Window(PropertyClass):
         await self.write_value_to_offset(152, int(style), Primitive.int32)
 
     async def flags(self) -> WindowFlags:
-        flags = await self.read_value_from_offset(156, Primitive.uint32)
+        flags = await self.read_value_from_offset(156, Primitive.int32)
         return WindowFlags(flags)
 
     async def write_flags(self, flags: WindowFlags):
-        await self.write_value_to_offset(156, int(flags), Primitive.uint32)
+        await self.write_value_to_offset(156, int(flags), Primitive.int32)
 
     async def window_rectangle(self) -> Rectangle:
         rect = await self.read_vector(160, 4, Primitive.int32)
