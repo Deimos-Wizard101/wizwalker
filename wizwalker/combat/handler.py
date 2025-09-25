@@ -382,6 +382,39 @@ class CombatHandler:
         except ValueError:
             return False
 
+    async def attempt_willcast(self,
+        *,
+        on_member: str = None,
+        on_client: bool = False
+        ):
+        """
+        Cast a willcast card
+
+        Args:
+            on_member: Name of the member to cast the card on
+            on_client: Bool if the card should be cast on the client
+        """
+        try:
+
+            spell_checkbox_windows = await self.client.root_window.get_windows_with_type("SpellCheckBox")
+            card = CombatCard(self, ([x for x in spell_checkbox_windows if await x.name() == "PetCard"])[0])
+            
+            if on_member:
+                target = await self.get_member_named(on_member)
+                await card.cast(target)
+
+            elif on_client:
+                target = await self.get_client_member()
+                await card.cast(target)
+
+            else:
+                await card.cast(None)
+
+            return True
+
+        except ValueError:
+            return False
+
     async def round_number(self) -> int:
         """
         Current round number
