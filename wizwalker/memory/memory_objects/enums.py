@@ -77,7 +77,7 @@ class WindowFlags(IntFlag):
     parent_height = 524288
     hcenter = 32768
     vcenter = 65536
-    disabled = -2147483648
+    disabled = 2147483648
 
 
 class SpellSourceType(Enum):
