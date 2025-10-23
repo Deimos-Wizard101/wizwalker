@@ -88,7 +88,7 @@ class ClientObject(CoreObject):
             List of DynamicClientObject
         """
         children = []
-        for addr in await self.read_shared_vector(384):
+        for addr in await self.read_shared_vector(392):
             children.append(DynamicClientObject(self.hook_handler, addr))
 
         return children
