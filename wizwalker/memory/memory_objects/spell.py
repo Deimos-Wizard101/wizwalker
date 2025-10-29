@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 from wizwalker.memory.memory_object import Primitive, DynamicMemoryObject, PropertyClass
-from .enums import DelayOrder
+from .enums import DelayOrder, FusionState
 from .spell_template import DynamicSpellTemplate
 from .spell_effect import (
     DynamicSpellEffect,
@@ -184,6 +184,18 @@ class Spell(PropertyClass):
 
     async def write_round_added_tc(self, round_added_t_c: int):
         await self.write_value_to_offset(260, round_added_t_c, Primitive.int32)
+
+    async def secondary_school_id(self) -> int:
+        return await self.read_value_from_offset(304, Primitive.uint32)
+
+    async def write_secondary_school_id(self, secondary_school_id: int):
+        await self.write_value_to_offset(304, secondary_school_id, Primitive.uint32)
+
+    async def fusion_state(self) -> FusionState:
+        return await self.read_enum(308, FusionState)
+
+    async def write_fusion_state(self, fusion_state: FusionState):
+        await self.write_enum(308, fusion_state)
 
 
 class GraphicalSpell(Spell):
