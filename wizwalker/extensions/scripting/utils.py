@@ -244,4 +244,4 @@ async def teleport_to_friend_from_list(
     await _teleport_to_friend(client, character_window)
 
     # close friends window
-    await friends_window.write_flags(WindowFlags(2147483648))
+    await friends_window.write_flags(WindowFlags.disabled)

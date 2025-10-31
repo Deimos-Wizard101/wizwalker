@@ -188,7 +188,39 @@ class Window(PropertyClass):
         """
         Writing to this when there isn't actually a .text could crash
         """
-        await self.write_wide_string_to_offset(584, text)
+        address = await self.read_base_address() + 584
+        string_len_addr = address + 16
+        encoded = text.encode("utf-16-le")
+        # len(encoded) instead of string bc it can be larger in some encodings
+        string_len = len(encoded)
+
+        current_string_len = await self.read_typed(address + 16, Primitive.int32)
+
+        # we need to create a pointer to the string data
+        #if string_len >= 7 > current_string_len:
+        #    # +1 for 0 byte after
+        #    pointer_address = await self.allocate(string_len + 1)
+
+            # need 0 byte for some c++ null termination standard
+        #   await self.write_bytes(pointer_address, encoded + b"\x00")
+        #    await self.write_typed(address, pointer_address, Primitive.int64)
+
+        # string is already a pointer
+        #elif string_len >= 7 and current_string_len >= 8:
+        
+        
+        # Assume Maybe Text is always a Pointer
+        
+        pointer_address = await self.read_typed(address, Primitive.int64)
+        await self.write_bytes(pointer_address, encoded + b"\x00")
+
+        # normal buffer string
+        #else:
+        #    await self.write_bytes(address, encoded + b"\x00")
+
+        # take 2 bytes
+        await self.write_typed(string_len_addr, string_len // 2, Primitive.int32)
+        #await self.write_wide_string_to_offset(584, text)
 
     async def name(self) -> str:
         return await self.read_string_from_offset(80)
@@ -222,11 +254,11 @@ class Window(PropertyClass):
         return DynamicWindow(self.hook_handler, addr)
 
     async def style(self) -> WindowStyle:
-        style = await self.read_value_from_offset(152, Primitive.int32)
+        style = await self.read_value_from_offset(152, Primitive.uint32)
         return WindowStyle(style)
 
     async def write_style(self, style: WindowStyle):
-        await self.write_value_to_offset(152, int(style), Primitive.int32)
+        await self.write_value_to_offset(152, int(style), Primitive.uint32)
 
     async def flags(self) -> WindowFlags:
         flags = await self.read_value_from_offset(156, Primitive.uint32)
