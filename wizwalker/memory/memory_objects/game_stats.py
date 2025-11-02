@@ -787,7 +787,19 @@ class GameStats(PropertyClass):
         return await self.read_value_from_offset(1100, Primitive.int32)
 
     async def write_secondary_school(self, secondary_school: int):
-        return await self.write_value_to_offset(1100, secondary_school, Primitive.int32)
+        await self.write_value_to_offset(1100, secondary_school, Primitive.int32)
+
+    async def disable_cross_play(self) -> bool:
+        return await self.read_value_from_offset(1104, Primitive.bool)
+
+    async def write_disable_cross_play(self, disable_cross_play: bool):
+        await self.write_value_to_offset(1104, disable_cross_play, Primitive.bool)
+
+    async def photo_filters(self) -> int:
+        return await self.read_value_from_offset(1108, Primitive.uint32)
+
+    async def write_photo_filters(self, photo_filters: int):
+        await self.write_value_to_offset(1108, photo_filters, Primitive.uint32)
 
 class CurrentGameStats(GameStats):
     async def read_base_address(self) -> int:

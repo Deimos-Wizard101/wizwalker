@@ -125,7 +125,7 @@ class ClientObject(CoreObject):
         """
         This client object's character id
         """
-        return await self.read_value_from_offset(440, Primitive.uint64)
+        return await self.read_value_from_offset(448, Primitive.uint64)
 
     async def write_character_id(self, character_id: int):
         """
@@ -134,7 +134,7 @@ class ClientObject(CoreObject):
         Args:
             character_id: The character id to write
         """
-        await self.write_value_to_offset(440, character_id, Primitive.uint64)
+        await self.write_value_to_offset(448, character_id, Primitive.uint64)
 
     # Note: not defined
     async def game_stats(self) -> Optional[DynamicGameStats]:
@@ -144,7 +144,7 @@ class ClientObject(CoreObject):
         Returns:
             DynamicGameStats
         """
-        addr = await self.read_value_from_offset(544, Primitive.int64)
+        addr = await self.read_value_from_offset(560, Primitive.int64)
 
         if addr == 0:
             return None
