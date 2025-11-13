@@ -369,64 +369,64 @@ class CombatParticipant(PropertyClass):
     #   return await self.read_value_from_offset(356, "enum DynamicSigilSymbol"")
 
     async def accuracy_bonus(self) -> float:
-        return await self.read_value_from_offset(396, Primitive.float32)
+        return await self.read_value_from_offset(400, Primitive.float32)
 
     async def write_accuracy_bonus(self, accuracy_bonus: float):
-        await self.write_value_to_offset(396, accuracy_bonus, Primitive.float32)
+        await self.write_value_to_offset(400, accuracy_bonus, Primitive.float32)
 
     async def minion_sub_circle(self) -> int:
-        return await self.read_value_from_offset(400, Primitive.int32)
+        return await self.read_value_from_offset(404, Primitive.int32)
 
     async def write_minion_sub_circle(self, minion_sub_circle: int):
-        await self.write_value_to_offset(400, minion_sub_circle, Primitive.int32)
+        await self.write_value_to_offset(404, minion_sub_circle, Primitive.int32)
 
     async def is_minion(self) -> bool:
-        return await self.read_value_from_offset(404, Primitive.bool)
+        return await self.read_value_from_offset(408, Primitive.bool)
 
     async def write_is_minion(self, is_minion: bool):
-        await self.write_value_to_offset(404, is_minion, Primitive.bool)
+        await self.write_value_to_offset(408, is_minion, Primitive.bool)
 
     async def is_accompany_npc(self) -> bool:
-        return await self.read_value_from_offset(412, Primitive.bool)
+        return await self.read_value_from_offset(416, Primitive.bool)
 
     async def write_is_accompany_npc(self, is_accompany_npc:bool) -> bool:
-        await self.write_value_to_offset(412, is_accompany_npc, Primitive.bool)
+        await self.write_value_to_offset(416, is_accompany_npc, Primitive.bool)
 
     async def hanging_effects(self) -> List[DynamicSpellEffect]:
         hanging_effects = []
-        for addr in await self.read_linked_list(416):
+        for addr in await self.read_linked_list(424):
             hanging_effects.append(DynamicSpellEffect(self.hook_handler, addr))
 
         return hanging_effects
 
     async def public_hanging_effects(self) -> List[DynamicSpellEffect]:
         hanging_effects = []
-        for addr in await self.read_linked_list(432):
+        for addr in await self.read_linked_list(440):
             hanging_effects.append(DynamicSpellEffect(self.hook_handler, addr))
 
         return hanging_effects
 
     async def aura_effects(self) -> List[DynamicSpellEffect]:
         aura_effects = []
-        for addr in await self.read_linked_list(448):
+        for addr in await self.read_linked_list(456):
             aura_effects.append(DynamicSpellEffect(self.hook_handler, addr))
 
         return aura_effects
 
     # TODO: add this class
     # async def shadow_effects(self) -> class SharedPointer<class ShadowSpellTrackingData>:
-    #     return await self.read_value_from_offset(464, "class SharedPointer<class ShadowSpellTrackingData>")
+    #     return await self.read_value_from_offset(472, "class SharedPointer<class ShadowSpellTrackingData>")
 
     async def shadow_spell_effects(self) -> List[DynamicSpellEffect]:
         shadow_spell_effects = []
-        for addr in await self.read_linked_list(480):
+        for addr in await self.read_linked_list(488):
             shadow_spell_effects.append(DynamicSpellEffect(self.hook_handler, addr))
 
         return shadow_spell_effects
 
     async def death_activated_effects(self) -> List[DynamicSpellEffect]:
         death_activated_effects = []
-        for addr in await self.read_shared_linked_list(512):
+        for addr in await self.read_shared_linked_list(520):
             death_activated_effects.append(DynamicSpellEffect(self.hook_handler, addr))
 
         return death_activated_effects
@@ -434,93 +434,93 @@ class CombatParticipant(PropertyClass):
     # note: these are actually DelaySpellEffects
     async def delay_cast_effects(self) -> List[DynamicSpellEffect]:
         delay_cast_effects = []
-        for addr in await self.read_linked_list(528):
+        for addr in await self.read_linked_list(536):
             delay_cast_effects.append(DynamicSpellEffect(self.hook_handler, addr))
 
         return delay_cast_effects
 
     async def polymorph_spell_template_id(self) -> int:
-        return await self.read_value_from_offset(576, Primitive.uint32)
+        return await self.read_value_from_offset(584, Primitive.uint32)
 
     async def write_polymorph_spell_template_id(self, polymorph_spell_template_id: int):
-        await self.write_value_to_offset(576, polymorph_spell_template_id, Primitive.uint32)
+        await self.write_value_to_offset(584, polymorph_spell_template_id, Primitive.uint32)
 
     async def side(self) -> str:
-        return await self.read_string_from_offset(600)
+        return await self.read_string_from_offset(608)
 
     async def write_side(self, side: str):
-        await self.write_string_to_offset(600, side)
+        await self.write_string_to_offset(608, side)
 
     async def shadow_spells_disabled(self) -> bool:
-        return await self.read_value_from_offset(672, Primitive.bool)
+        return await self.read_value_from_offset(680, Primitive.bool)
 
     async def write_shadow_spells_disabled(self, shadow_spells_disabled: bool):
-        await self.write_value_to_offset(672, shadow_spells_disabled, Primitive.bool)
+        await self.write_value_to_offset(680, shadow_spells_disabled, Primitive.bool)
 
     async def ignore_spells_pvp_only_flag(self) -> bool:
-        return await self.read_value_from_offset(673, Primitive.bool)
+        return await self.read_value_from_offset(681, Primitive.bool)
 
     async def write_ignore_spells_pvp_only_flag(self, ignore_spells_pvp_only_flag: bool):
-        await self.write_value_to_offset(673, ignore_spells_pvp_only_flag, Primitive.bool)
+        await self.write_value_to_offset(681, ignore_spells_pvp_only_flag, Primitive.bool)
 
     async def ignore_spells_pve_only_flag(self) -> bool:
-        return await self.read_value_from_offset(674, Primitive.bool)
+        return await self.read_value_from_offset(682, Primitive.bool)
 
     async def write_ignore_spells_pve_only_flag(self, ignore_spells_pvp_only_flag: bool):
-        await self.write_value_to_offset(674, ignore_spells_pvp_only_flag, Primitive.bool)
+        await self.write_value_to_offset(682, ignore_spells_pvp_only_flag, Primitive.bool)
 
     async def boss_mob(self) -> bool:
         # we use the npc template instead if possible
         templ = await self.fetch_npc_behavior_template()
         if templ is None:
             # The offset isn't accurate enough for our purposes, but we can fall back to it
-            return await self.read_value_from_offset(675, Primitive.bool)
+            return await self.read_value_from_offset(683, Primitive.bool)
         return await templ.mob_title() == NpcBehaviorTemplateTitleType.boss
 
     async def hide_pvp_enemy_chat(self) -> bool:
-        return await self.read_value_from_offset(676, Primitive.bool)
+        return await self.read_value_from_offset(684, Primitive.bool)
 
     async def write_hide_pvp_enemy_chat(self, hide_pvp_enemy_chat: bool):
-        await self.write_value_to_offset(676, hide_pvp_enemy_chat, Primitive.bool)
+        await self.write_value_to_offset(684, hide_pvp_enemy_chat, Primitive.bool)
 
     async def combat_trigger_ids(self) -> int:
-        return await self.read_value_from_offset(696, Primitive.int32)
+        return await self.read_value_from_offset(704, Primitive.int32)
 
     async def write_combat_trigger_ids(self, combat_trigger_ids: int):
-        await self.write_value_to_offset(696, combat_trigger_ids, Primitive.int32)
+        await self.write_value_to_offset(704, combat_trigger_ids, Primitive.int32)
 
     async def backlash(self) -> int:
-        return await self.read_value_from_offset(724, Primitive.int32)
-
-    async def write_backlash(self, backlash: int):
-        await self.write_value_to_offset(724, backlash, Primitive.int32)
-
-    async def past_backlash(self) -> int:
-        return await self.read_value_from_offset(728, Primitive.int32)
-
-    async def write_past_backlash(self, past_backlash: int):
-        await self.write_value_to_offset(728, past_backlash, Primitive.int32)
-
-    async def shadow_creature_level(self) -> int:
         return await self.read_value_from_offset(732, Primitive.int32)
 
-    async def write_shadow_creature_level(self, shadow_creature_level: int):
-        await self.write_value_to_offset(732, shadow_creature_level, Primitive.int32)
+    async def write_backlash(self, backlash: int):
+        await self.write_value_to_offset(732, backlash, Primitive.int32)
 
-    async def past_shadow_creature_level(self) -> int:
+    async def past_backlash(self) -> int:
         return await self.read_value_from_offset(736, Primitive.int32)
 
-    async def write_past_shadow_creature_level(self, past_shadow_creature_level: int):
-        await self.write_value_to_offset(736, past_shadow_creature_level, Primitive.int32)
+    async def write_past_backlash(self, past_backlash: int):
+        await self.write_value_to_offset(736, past_backlash, Primitive.int32)
 
-    async def shadow_creature_level_count(self) -> int:
+    async def shadow_creature_level(self) -> int:
+        return await self.read_value_from_offset(740, Primitive.int32)
+
+    async def write_shadow_creature_level(self, shadow_creature_level: int):
+        await self.write_value_to_offset(740, shadow_creature_level, Primitive.int32)
+
+    async def past_shadow_creature_level(self) -> int:
         return await self.read_value_from_offset(744, Primitive.int32)
 
+    async def write_past_shadow_creature_level(self, past_shadow_creature_level: int):
+        await self.write_value_to_offset(744, past_shadow_creature_level, Primitive.int32)
+
+    async def shadow_creature_level_count(self) -> int:
+        return await self.read_value_from_offset(752, Primitive.int32)
+
     async def write_shadow_creature_level_count(self, shadow_creature_level_count: int):
-        await self.write_value_to_offset(744, shadow_creature_level_count, Primitive.int32)
+        await self.write_value_to_offset(752, shadow_creature_level_count, Primitive.int32)
 
     async def intercept_effect(self) -> Optional[DynamicSpellEffect]:
-        addr = await self.read_value_from_offset(768, Primitive.int64)
+        addr = await self.read_value_from_offset(776, Primitive.int64)
 
         if addr == 0:
             return None
@@ -528,13 +528,13 @@ class CombatParticipant(PropertyClass):
         return DynamicSpellEffect(self.hook_handler, addr)
 
     async def rounds_since_shadow_pip(self) -> int:
-        return await self.read_value_from_offset(800, Primitive.int32)
+        return await self.read_value_from_offset(808, Primitive.int32)
 
     async def write_rounds_since_shadow_pip(self, rounds_since_shadow_pip: int):
-        await self.write_value_to_offset(800, rounds_since_shadow_pip, Primitive.int32)
+        await self.write_value_to_offset(808, rounds_since_shadow_pip, Primitive.int32)
 
     async def polymorph_effect(self) -> Optional[DynamicSpellEffect]:
-        addr = await self.read_value_from_offset(824, Primitive.int64)
+        addr = await self.read_value_from_offset(832, Primitive.int64)
 
         if addr == 0:
             return None
@@ -602,136 +602,142 @@ class CombatParticipant(PropertyClass):
         await self.write_value_to_offset(220, mindcontrolled_display, Primitive.bool)
 
     async def auto_pass(self) -> bool:
-        return await self.read_value_from_offset(720, Primitive.bool)
+        return await self.read_value_from_offset(728, Primitive.bool)
 
     async def write_auto_pass(self, auto_pass: bool):
-        await self.write_value_to_offset(720, auto_pass, Primitive.bool)
+        await self.write_value_to_offset(728, auto_pass, Primitive.bool)
 
     async def vanish(self) -> bool:
-        return await self.read_value_from_offset(721, Primitive.bool)
+        return await self.read_value_from_offset(729, Primitive.bool)
 
     async def write_vanish(self, vanish: bool):
-        await self.write_value_to_offset(721, vanish, Primitive.bool)
+        await self.write_value_to_offset(729, vanish, Primitive.bool)
 
     async def my_team_turn(self) -> bool:
-        return await self.read_value_from_offset(722, Primitive.bool)
+        return await self.read_value_from_offset(730, Primitive.bool)
 
     async def write_my_team_turn(self, my_team_turn: bool):
-        await self.write_value_to_offset(722, my_team_turn, Primitive.bool)
+        await self.write_value_to_offset(730, my_team_turn, Primitive.bool)
 
     async def planning_phase_pip_aquired_type(self) -> PipAquiredByEnum:
-        return await self.read_enum(816, PipAquiredByEnum)
+        return await self.read_enum(824, PipAquiredByEnum)
 
     async def write_planning_phase_pip_aquired_type(self, planning_phase_pip_aquired_type: PipAquiredByEnum):
-        await self.write_enum(816, planning_phase_pip_aquired_type)
+        await self.write_enum(824, planning_phase_pip_aquired_type)
 
     # async def cheat_settings(self) -> class SharedPointer<class CombatCheatSettings>:
     #     return await self.read_value_from_offset(96, "class SharedPointer<class CombatCheatSettings>")
 
     async def is_monster(self) -> int:
-        return await self.read_value_from_offset(408, Primitive.uint32)
+        return await self.read_value_from_offset(412, Primitive.uint32)
 
     async def write_is_monster(self, is_monster: int):
-        await self.write_value_to_offset(408, is_monster, Primitive.uint32)
+        await self.write_value_to_offset(412, is_monster, Primitive.uint32)
 
     # async def weapon_nif_sound_list(self) -> class SharedPointer<class SpellNifSoundOverride>:
     #     return await self.read_value_from_offset(80, "class SharedPointer<class SpellNifSoundOverride>")
 
     async def pet_combat_trigger(self) -> int:
-        return await self.read_value_from_offset(712, Primitive.int32)
+        return await self.read_value_from_offset(720, Primitive.int32)
 
     async def write_pet_combat_trigger(self, pet_combat_trigger: int):
-        await self.write_value_to_offset(712, pet_combat_trigger, Primitive.int32)
+        await self.write_value_to_offset(720, pet_combat_trigger, Primitive.int32)
 
     async def pet_combat_trigger_target(self) -> int:
-        return await self.read_value_from_offset(716, Primitive.int32)
+        return await self.read_value_from_offset(724, Primitive.int32)
 
     async def write_pet_combat_trigger_target(self, pet_combat_trigger_target: int):
-        await self.write_value_to_offset(716, pet_combat_trigger_target, Primitive.int32)
+        await self.write_value_to_offset(724, pet_combat_trigger_target, Primitive.int32)
 
     async def shadow_pip_rate_threshold(self) -> float:
-        return await self.read_value_from_offset(840, Primitive.float32)
-
-    async def write_shadow_pip_rate_threshold(self, shadow_pip_rate_threshold: float):
-        await self.write_value_to_offset(840, shadow_pip_rate_threshold, Primitive.float32)
-
-    async def base_spell_damage(self) -> int:
-        return await self.read_value_from_offset(844, Primitive.int32)
-
-    async def write_base_spell_damage(self, base_spell_damage: int):
-        await self.write_value_to_offset(844, base_spell_damage, Primitive.int32)
-
-    async def stat_damage(self) -> float:
         return await self.read_value_from_offset(848, Primitive.float32)
 
-    async def write_stat_damage(self, stat_damage: float):
-        await self.write_value_to_offset(848, stat_damage, Primitive.float32)
+    async def write_shadow_pip_rate_threshold(self, shadow_pip_rate_threshold: float):
+        await self.write_value_to_offset(848, shadow_pip_rate_threshold, Primitive.float32)
 
-    async def stat_resist(self) -> float:
-        return await self.read_value_from_offset(852, Primitive.float32)
+    async def base_spell_damage(self) -> int:
+        return await self.read_value_from_offset(852, Primitive.int32)
 
-    async def write_stat_resist(self, stat_resist: float):
-        await self.write_value_to_offset(852, stat_resist, Primitive.float32)
+    async def write_base_spell_damage(self, base_spell_damage: int):
+        await self.write_value_to_offset(852, base_spell_damage, Primitive.int32)
 
-    async def stat_pierce(self) -> float:
+    async def stat_damage(self) -> float:
         return await self.read_value_from_offset(856, Primitive.float32)
 
+    async def write_stat_damage(self, stat_damage: float):
+        await self.write_value_to_offset(856, stat_damage, Primitive.float32)
+
+    async def stat_resist(self) -> float:
+        return await self.read_value_from_offset(860, Primitive.float32)
+
+    async def write_stat_resist(self, stat_resist: float):
+        await self.write_value_to_offset(860, stat_resist, Primitive.float32)
+
+    async def stat_pierce(self) -> float:
+        return await self.read_value_from_offset(864, Primitive.float32)
+
     async def write_stat_pierce(self, stat_pierce: float):
-        await self.write_value_to_offset(856, stat_pierce, Primitive.float32)
+        await self.write_value_to_offset(864, stat_pierce, Primitive.float32)
 
     async def mob_level(self) -> int:
-        return await self.read_value_from_offset(860, Primitive.int32)
+        return await self.read_value_from_offset(868, Primitive.int32)
 
     async def write_mob_level(self, mob_level: int):
-        await self.write_value_to_offset(860, mob_level, Primitive.int32)
+        await self.write_value_to_offset(868, mob_level, Primitive.int32)
 
     async def player_time_updated(self) -> bool:
-        return await self.read_value_from_offset(864, Primitive.bool)
+        return await self.read_value_from_offset(872, Primitive.bool)
 
     async def write_player_time_updated(self, player_time_updated: bool):
-        await self.write_value_to_offset(864, player_time_updated, Primitive.bool)
+        await self.write_value_to_offset(872, player_time_updated, Primitive.bool)
 
     async def player_time_eliminated(self) -> bool:
-        return await self.read_value_from_offset(865, Primitive.bool)
+        return await self.read_value_from_offset(873, Primitive.bool)
 
     async def write_player_time_eliminated(self, player_time_eliminated: bool):
-        await self.write_value_to_offset(865, player_time_eliminated, Primitive.bool)
+        await self.write_value_to_offset(873, player_time_eliminated, Primitive.bool)
 
     async def player_time_warning(self) -> bool:
-        return await self.read_value_from_offset(866, Primitive.bool)
+        return await self.read_value_from_offset(874, Primitive.bool)
 
     async def write_player_time_warning(self, player_time_warning: bool):
-        await self.write_value_to_offset(866, player_time_warning, Primitive.bool)
+        await self.write_value_to_offset(874, player_time_warning, Primitive.bool)
 
     async def deck_fullness(self) -> float:
-        return await self.read_value_from_offset(868, Primitive.float32)
-
-    async def write_deck_fullness(self, deck_fullness: float):
-        await self.write_value_to_offset(868, deck_fullness, Primitive.float32)
-
-    async def archmastery_points(self) -> float:
-        return await self.read_value_from_offset(872, Primitive.float32)
-
-    async def write_archmastery_points(self, archmastery_points: float):
-        await self.write_value_to_offset(872, archmastery_points, Primitive.float32)
-
-    async def max_archmastery_points(self) -> float:
         return await self.read_value_from_offset(876, Primitive.float32)
 
+    async def write_deck_fullness(self, deck_fullness: float):
+        await self.write_value_to_offset(876, deck_fullness, Primitive.float32)
+
+    async def archmastery_points(self) -> float:
+        return await self.read_value_from_offset(880, Primitive.float32)
+
+    async def write_archmastery_points(self, archmastery_points: float):
+        await self.write_value_to_offset(880, archmastery_points, Primitive.float32)
+
+    async def max_archmastery_points(self) -> float:
+        return await self.read_value_from_offset(884, Primitive.float32)
+
     async def write_max_archmastery_points(self, max_archmastery_points: float):
-        await self.write_value_to_offset(876, max_archmastery_points, Primitive.float32)
+        await self.write_value_to_offset(884, max_archmastery_points, Primitive.float32)
 
     async def archmastery_school(self) -> int:
-        return await self.read_value_from_offset(880, Primitive.uint32)
+        return await self.read_value_from_offset(888, Primitive.uint32)
 
     async def write_archmastery_school(self, archmastery_school: int):
-        await self.write_value_to_offset(880, archmastery_school, Primitive.uint32)
+        await self.write_value_to_offset(888, archmastery_school, Primitive.uint32)
 
     async def archmastery_flags(self) -> int:
-        return await self.read_value_from_offset(884, Primitive.uint32)
+        return await self.read_value_from_offset(892, Primitive.uint32)
 
     async def write_archmastery_flags(self, archmastery_flags: int):
-        await self.write_value_to_offset(884, archmastery_flags, Primitive.uint32)
+        await self.write_value_to_offset(892, archmastery_flags, Primitive.uint32)
+        
+    async def shadow_pact_target(self) -> int:
+        return await self.read_value_from_offset(392, Primitive.int32)
+    
+    async def write_shadow_pact_target(self, shadow_pact_target: int):
+        await self.write_value_to_offset(392, shadow_pact_target, Primitive.int32)
 
 class DynamicCombatParticipant(DynamicMemoryObject, CombatParticipant):
     pass
