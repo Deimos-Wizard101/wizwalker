@@ -134,7 +134,7 @@ class CacheHandler:
         lang_file_names = []
 
         for file_name in await root_wad.names():
-            if file_name.startswith("Locale/English/"):
+            if file_name.startswith("Locale/en-US/"):
                 lang_file_names.append(file_name)
 
         return lang_file_names
@@ -266,7 +266,7 @@ class CacheHandler:
 
         cached = False
         for filename in lang_files:
-            if filename == f"Locale/English/{lang_filename}.lang":
+            if filename == f"Locale/en-US/{lang_filename}.lang":
                 await self._cache_lang_file(self._root_wad, filename)
                 cached = True
                 break
