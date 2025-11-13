@@ -310,5 +310,23 @@ class SpellTemplate(CoreTemplate):
 
         return DynamicSpellRank(self.hook_handler, addr)
 
+    async def secondary_school_name(self) -> str:
+        return await self.read_string_from_offset(800)
+
+    async def write_secondary_school_name(self, secondary_school_name: str):
+        await self.write_string_to_offset(800, secondary_school_name)
+
+    async def spell_fusion(self) -> int:
+        return await self.read_value_from_offset(836, Primitive.uint32)
+
+    async def write_spell_fusion(self, spell_fusion: int):
+        await self.write_value_to_offset(836, spell_fusion, Primitive.uint32)
+
+    async def required_school_name(self) -> str:
+        return await self.read_string_from_offset(848)
+
+    async def write_required_school_name(self, required_school_name: str):
+        await self.write_string_to_offset(848, required_school_name)
+
 class DynamicSpellTemplate(SpellTemplate):
     pass

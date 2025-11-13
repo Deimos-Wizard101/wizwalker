@@ -4,6 +4,7 @@ from wizwalker.memory.memory_object import Primitive, DynamicMemoryObject, Prope
 from .enums import (
     SpellEffects,
     EffectTarget,
+    EffectKinds,
     HangingDisposition,
     HangingEffectType,
     OutputEffectSelector,
@@ -150,7 +151,8 @@ class SpellEffect(PropertyClass):
                 "RandomPerTargetSpellEffect",
                 "VariableSpellEffect",
                 "EffectListSpellEffect",
-                "ShadowSpellEffect"
+                "ShadowSpellEffect",
+                "ShadowPactSpellEffect"
             ):
                 raise ValueError(
                     f"This object is a {type_name} not a"
@@ -338,6 +340,38 @@ class ShadowSpellEffect(EffectListSpellEffect):
         await self.write_value_to_offset(240, intial_backlash, Primitive.int32)
 
 
+class ShadowPactSpellEffect(ShadowSpellEffect):
+    async def caster_sc(self) -> int:
+        return await self.read_value_from_offset(248, Primitive.int32)
+
+    async def write_caster_sc(self, caster_sc: int):
+        await self.write_value_to_offset(248, caster_sc, Primitive.int32)
+
+    async def target_sc(self) -> int:
+        return await self.read_value_from_offset(252, Primitive.int32)
+
+    async def write_target_sc(self, target_sc: int):
+        await self.write_value_to_offset(252, target_sc, Primitive.int32)
+
+    async def pact_effect_kind(self) -> EffectKinds:
+        return await self.read_enum(256, EffectKinds)
+
+    async def write_pact_effect_kind(self, pact_effect_kind: EffectKinds):
+        await self.write_enum(256, pact_effect_kind)
+
+    async def backlash_per_round(self) -> int:
+        return await self.read_value_from_offset(260, Primitive.int32)
+
+    async def write_backlash_per_round(self, backlash_per_round: int):
+        await self.write_value_to_offset(260, backlash_per_round, Primitive.int32)
+
+    async def added_in_round(self) -> int:
+        return await self.read_value_from_offset(264, Primitive.int32)
+
+    async def write_added_in_round(self, added_in_round: int):
+        await self.write_value_to_offset(264, added_in_round, Primitive.int32)
+
+
 async def cast_effect_variant(read_effect: DynamicSpellEffect) -> DynamicSpellEffect:
     '''
     Creates an effect variant based on the output of read_type_name for an effect PropertyClass.\n
@@ -355,6 +389,9 @@ async def cast_effect_variant(read_effect: DynamicSpellEffect) -> DynamicSpellEf
 
         case "ShadowSpellEffect":
             return ShadowSpellEffect(read_effect.hook_handler, addr)
+
+        case "ShadowPactSpellEffect":
+            return ShadowPactSpellEffect(read_effect.hook_handler, addr)
 
         case "CountBasedSpellEffect":
             return CountBasedSpellEffect(read_effect.hook_handler, addr)
