@@ -290,7 +290,7 @@ class ClientHook(SimpleHook):
                 b"\x48\x8B\xC7"  # mov rax,rdi
                 b"\x48\xA3" + packed_exports[0][1] +  # mov [current_client], rax
                 b"\x58"  # pop rax
-                b"\x48\x8B\x9B\xB8\x01\x00\x00"  # original instruction
+                b"\x48\x8B\x9B\xC0\x01\x00\x00"  # original instruction
         )
         # fmt: on
 
