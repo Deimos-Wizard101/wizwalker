@@ -61,7 +61,7 @@ class NPCBehaviorTemplate(DynamicBehaviorTemplate):
         return await self.read_value_from_offset(136, Primitive.bool)
 
     async def aggressive_factor(self) -> int:
-        return await self.read_value_from_offset(140, Primitive.int)
+        return await self.read_value_from_offset(140, Primitive.int32)
 
     async def boss_mob(self) -> bool:
         return await self.read_value_from_offset(144, Primitive.bool)
