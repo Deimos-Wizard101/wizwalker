@@ -94,7 +94,7 @@ class CombatCard:
             if await confirm_window.is_visible():
                 try:
                     await self.combat_handler.client.mouse_handler.click_window_with_name("ConfirmTargetsConfirm")
-                except:
+                except ValueError:
                     pass
 
         else:
