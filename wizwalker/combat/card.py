@@ -23,7 +23,7 @@ class CombatCard:
     # TODO: add checks before casting
     async def cast(
         self,
-        target: Union["CombatCard", "wizwalker.combat.CombatMember", None],
+        target: Union["CombatCard", "wizwalker.combat.CombatMember", "List", None],
         *,
         sleep_time: Optional[float] = 1.0,
         debug_paint: bool = False,
@@ -73,6 +73,29 @@ class CombatCard:
                 self._spell_window
             )
             # we don't need to sleep because nothing will be casted after
+
+        elif isinstance(target, List):
+            await self.combat_handler.client.mouse_handler.click_window(
+                self._spell_window
+            )
+
+            # see above
+            if sleep_time is not None:
+                await asyncio.sleep(sleep_time)
+
+            for t in target:
+                await self.combat_handler.client.mouse_handler.click_window(
+                    await t.get_health_text_window()
+                )
+                if sleep_time is not None:
+                    await asyncio.sleep(sleep_time)
+
+            confirm_window = (await self.combat_handler.client.root_window.get_windows_with_name("ConfirmTargetsWindow"))[0]
+            if await confirm_window.is_visible():
+                try:
+                    await self.combat_handler.client.mouse_handler.click_window_with_name("ConfirmTargetsConfirm")
+                except ValueError:
+                    pass
 
         else:
             await self.combat_handler.client.mouse_handler.click_window(

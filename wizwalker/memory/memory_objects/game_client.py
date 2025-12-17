@@ -257,7 +257,7 @@ class CurrentGameClient(GameClient):
         if self._base_address is not None:
             return self._base_address
 
-        addr = await self.pattern_scan(rb"\x48\x8b.....\x48\x8b.\x80\xb8....\x00\x74.\x4c\x8b")
+        addr = await self.pattern_scan(rb"\x48\x8b.....\x48\x8b.\x80\xb8....\x00\x74.\x4c\x8b", module="WizardGraphicalClient.exe")
         offset = await self.read_typed(addr + 3, Primitive.int32)
 
         self._base_address = await self.read_typed(addr + 7 + offset, Primitive.uint64)
