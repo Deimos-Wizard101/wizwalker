@@ -338,9 +338,12 @@ class RenderContextHook(SimpleHook):
 
 
 class MovementTeleportHook(SimpleHook):
-    pattern = rb"\x48\x89\x5C\x24\x08\x57\x48\x83\xEC." \
-              rb"\x48\x8B\x99....\x48\x85\xDB\x74\x2F" \
-              rb"\x4C\x8B\x43.\x48\x8B\x5B.\x48\x85\xDB\x74\x04"
+    pattern = rb"\x57\x48\x83\xEC.\x48\x8B\x99...." \
+              rb"\x48\x85\xDB\x74.\x4C\x8B\x43.\x48\x8B\x5B"\
+              rb".\x48\x85\xDB\x74.\xF0\xFF\x43.\x4D\x85" \
+              rb"\xC0\x74.\xF2\x0F\x10\x02\xF2\x41\x0F\x11\x40" \
+              rb".\x8B\x42.\x41\x89\x40.\x41\xC6\x80."
+
     instruction_length = 6
     noops = 1
     # position vector = 12 + 1 for update bool + 8 for target object address
@@ -455,9 +458,9 @@ class MovementTeleportHook(SimpleHook):
             b"\x48\xA3" + packed_jes_and +
             b"\x48\xB8" + jes_cmp_bytes +
             b"\x48\xA3" + packed_jes_cmp +
-            b"\x58"  # pop rax
-            b"\x48\x89\x5C\x24\x08" # mov [rsp+08],rbx (original bytes)
-            b"\x57"  # push rdi (original bytes)
+            b"\x58" # pop rax
+            b"\x57" # push rdi (original bytes)
+            b"\x48\x83\xEC\x20" # sub rsp,20 (original bytes)
         )
         # fmt: on
 
