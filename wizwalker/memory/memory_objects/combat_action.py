@@ -78,7 +78,7 @@ class CombatAction(MemoryObject):
         await self.write_value_to_offset(220, effect_chosen, Primitive.uint32)
 
     async def string_key_message(self) -> str:
-        return await self.read_string_from_offset(212246)
+        return await self.read_string_from_offset(224)
 
     async def write_string_key_message(self, string_key_message: str):
         await self.write_string_to_offset(224, string_key_message)
