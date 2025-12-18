@@ -345,7 +345,7 @@ class MovementTeleportHook(SimpleHook):
               rb".\x8B\x42.\x41\x89\x40.\x41\xC6\x80."
 
     instruction_length = 6
-    noops = 1
+    noops = 0
     # position vector = 12 + 1 for update bool + 8 for target object address
     exports = [("teleport_helper", 21)]
 
