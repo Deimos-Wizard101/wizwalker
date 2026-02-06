@@ -8,7 +8,7 @@ readme = "README.md"
 repository = "https://github.com/StarrFox/wizwalker"
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.14"
 loguru = "^0.7.2"
 aiofiles = "^23.2.1"
 pymem = "1.13.1"
