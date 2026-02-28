@@ -52,3 +52,5 @@ from .adventure_party_join_info import (
 )
 from .unlock_trigger_list import UnlockTriggerList, DynamicUnlockTriggerList
 from .unlock_trigger_info import UnlockTriggerInfo, DynamicUnlockTriggerInfo
+from .spellbook_behavior import ClientSpellbookBehavior, SpellbookSpellEntry
+from .deck_behavior import ClientDeckBehavior, ClientTreasureBookBehavior, SpellData
