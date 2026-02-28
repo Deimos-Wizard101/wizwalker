@@ -3,8 +3,8 @@ from .enums import UnlockTriggerState
 
 
 # C++ class: UnlockTriggerInfo (PropertyClass, size 0x68)
-# Registered: FUN_1413ed1b0("UnlockTriggerInfo") at FUN_141461b10
-# Field registration: FUN_141461bb0
+# Registered: FUN_1413ed1b0("UnlockTriggerInfo") at FUN_141461b10 (r792258)
+# Field registration: FUN_141461bb0 (r792258)
 #
 # Offset  Field                        Type
 # ------  -----                        ----
@@ -17,11 +17,11 @@ from .enums import UnlockTriggerState
 # 0x60    m_reagentCount5              uint32
 # 0x64    m_reagentCount6              uint32
 #
-# Getter switch at FUN_141462230:
+# Getter switch at FUN_141462230 (r792258):
 #   case 0 -> 0x50, case 1 -> 0x54, case 2 -> 0x58
 #   case 3 -> 0x5C, case 4 -> 0x60, case 5 -> 0x64
 #
-# Setter switch at FUN_1414622a0: same layout.
+# Setter switch at FUN_1414622a0 (r792258): same layout.
 
 
 class UnlockTriggerInfo(PropertyClass):
@@ -53,7 +53,7 @@ class UnlockTriggerInfo(PropertyClass):
         return await self.read_value_from_offset(0x64, Primitive.uint32)
 
     async def reagent_count_by_index(self, index: int) -> int:
-        """Read reagent count by index (0-5), matching FUN_141462230."""
+        """Read reagent count by index (0-5), matching FUN_141462230 (r792258)."""
         if not 0 <= index <= 5:
             raise ValueError(f"ReagentIndex must be 0-5, got {index}")
         return await self.read_value_from_offset(0x50 + (index * 4), Primitive.uint32)

@@ -3,8 +3,8 @@ from wizwalker.memory.memory_object import Primitive, DynamicMemoryObject, Prope
 
 # C++ class: AdventurePartyEntryInfo (PropertyClass)
 # RTTI: .?AVAdventurePartyEntryInfo@@
-# Type registration: FUN_14145f190 -> FUN_1413ed1b0("AdventurePartyEntryInfo")
-# Field registration: FUN_14145f230
+# Type registration: FUN_14145f190 -> FUN_1413ed1b0("AdventurePartyEntryInfo") (r792258)
+# Field registration: FUN_14145f230 (r792258)
 #
 # Represents a single member within an adventure party.
 # Listed inside AdventurePartyInfo.m_adventurePartyMemberList.
@@ -27,7 +27,7 @@ from wizwalker.memory.memory_object import Primitive, DynamicMemoryObject, Prope
 # 0xB8    m_accountGID         GID/uint64  Account global ID
 #
 # Flags bit 0:
-#   The MSG_RequestAdventureParty handler (FUN_141208900) checks
+#   The MSG_RequestAdventureParty handler (FUN_141208900, r792258) checks
 #   (*(byte*)(entry + 0xA8) & 1) to distinguish the owner/leader entry
 #   from regular members when rebuilding the sorted member list.
 

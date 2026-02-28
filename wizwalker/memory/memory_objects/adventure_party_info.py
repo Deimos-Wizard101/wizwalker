@@ -6,8 +6,8 @@ from .adventure_party_entry_info import DynamicAdventurePartyEntryInfo
 
 # C++ class: AdventurePartyInfo (PropertyClass)
 # RTTI: .?AVAdventurePartyInfo@@
-# Type registration: FUN_14145fcd0 -> FUN_1413ed1b0("AdventurePartyInfo")
-# Field registration: FUN_14145fd70
+# Type registration: FUN_14145fcd0 -> FUN_1413ed1b0("AdventurePartyInfo") (r792258)
+# Field registration: FUN_14145fd70 (r792258)
 #
 # Represents a single adventure party with its metadata and member list.
 # Listed inside AdventurePartyList.m_adventurePartyList.

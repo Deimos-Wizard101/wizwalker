@@ -6,8 +6,8 @@ from .adventure_party_join_info import DynamicAdventurePartyJoinInfo
 
 # C++ class: AdventurePartyJoinList (PropertyClass)
 # RTTI: .?AVAdventurePartyJoinList@@
-# Type registration: FUN_141461580 -> FUN_1413ed1b0("AdventurePartyJoinList")
-# Field registration: FUN_141461580 (inline)
+# Type registration: FUN_141461580 -> FUN_1413ed1b0("AdventurePartyJoinList") (r792258)
+# Field registration: FUN_141461580 (inline) (r792258)
 #
 # Container PropertyClass holding a list of joinable parties (kiosk data).
 #

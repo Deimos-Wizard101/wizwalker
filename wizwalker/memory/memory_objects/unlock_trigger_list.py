@@ -5,8 +5,8 @@ from .unlock_trigger_info import DynamicUnlockTriggerInfo
 
 
 # C++ class: UnlockTriggerList (PropertyClass)
-# Registered: FUN_1413ed1b0("UnlockTriggerList") at FUN_141462300
-# Field registration: FUN_1414623a0
+# Registered: FUN_1413ed1b0("UnlockTriggerList") at FUN_141462300 (r792258)
+# Field registration: FUN_1414623a0 (r792258)
 #
 # Offset  Field                Type
 # ------  -----                ----
@@ -18,7 +18,7 @@ from .unlock_trigger_info import DynamicUnlockTriggerInfo
 # In SocialSystemsManager this is embedded at offset 0x1E0, so:
 #   m_unlockTriggerList = SocialSystemsManager + 0x1E0 + 0x48 = 0x228
 #
-# Populated by MSG_UnlockTriggerData (FUN_141213660):
+# Populated by MSG_UnlockTriggerData (FUN_141213660, r792258):
 #   The "Buffer" DML field is deserialized into this PropertyClass,
 #   filling m_unlockTriggerList with the guild's unlock trigger entries.
 

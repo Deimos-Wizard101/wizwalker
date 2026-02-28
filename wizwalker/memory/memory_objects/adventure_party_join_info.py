@@ -3,8 +3,8 @@ from wizwalker.memory.memory_object import Primitive, DynamicMemoryObject, Prope
 
 # C++ class: AdventurePartyJoinInfo (PropertyClass)
 # RTTI: .?AVAdventurePartyJoinInfo@@
-# Type registration: FUN_141460e70 -> FUN_1413ed1b0("AdventurePartyJoinInfo")
-# Field registration: FUN_141460f10
+# Type registration: FUN_141460e70 -> FUN_1413ed1b0("AdventurePartyJoinInfo") (r792258)
+# Field registration: FUN_141460f10 (r792258)
 #
 # Represents a joinable party entry in the Social Kiosk.
 # Listed inside AdventurePartyJoinList.m_adventurePartyJoinList.

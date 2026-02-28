@@ -14,9 +14,9 @@ from .adventure_party_list import DynamicAdventurePartyList
 
 # C++ class: SocialSystemsManager
 # Source: WizardGraphicalClient\SocialSystems\SocialSystemsManager.cpp
-# Constructor: FUN_141203f30
+# Constructor: FUN_141203f30 (r792258)
 #
-# Class layout (from constructor FUN_141203f30):
+# Class layout (from constructor FUN_141203f30, r792258):
 # ==============================================
 # Offset  Type                    Description
 # ------  ----                    -----------
@@ -87,7 +87,7 @@ class SocialSystemsManager(PropertyClass):
 
     async def stored_party_gid(self) -> int:
         """Stored Party GID at 0x1B0.
-        Compared in HandleCharacterChanged (FUN_1412223a0);
+        Compared in HandleCharacterChanged (FUN_1412223a0, r792258);
         if it differs from the guild's PartyGID, MSG_UNLOCKTRIGGERDATA is re-sent.
         """
         return await self.read_value_from_offset(0x1B0, Primitive.uint64)
@@ -139,7 +139,7 @@ class SocialSystemsManager(PropertyClass):
     async def adventure_party_list(self) -> Optional[DynamicAdventurePartyList]:
         """Shared pointer to deserialized AdventurePartyList at 0xA8.
 
-        Populated by MSG_RequestAdventureParty (FUN_141208900) from the
+        Populated by MSG_RequestAdventureParty (FUN_141208900, r792258) from the
         "Buffer" DML field. Contains the full party hierarchy:
           AdventurePartyList -> [AdventurePartyInfo] -> [AdventurePartyEntryInfo]
 
@@ -229,7 +229,7 @@ class CurrentSocialSystemsManager(SocialSystemsManager):
 
     Why the singleton getter's cached global doesn't work
     =====================================================
-    The SSM has getter functions (e.g. FUN_14122bb40, FUN_141203ea0) that
+    The SSM has getter functions (e.g. FUN_14122bb40, FUN_141203ea0, r792258) that
     look like standard singleton accessors — they check a lock flag, call a
     registry lookup, and store the result to a global (e.g. DAT_14328de88).
     However, these getters are never called at runtime. The initialization
@@ -237,7 +237,7 @@ class CurrentSocialSystemsManager(SocialSystemsManager):
     never executed.
 
     Instead, the SSM is created directly by a parent object's constructor
-    (FUN_1412c6570) and stored at parent+0x23280 via shared_ptr. It lives on
+    (FUN_1412c6570, r792258) and stored at parent+0x23280 via shared_ptr. It lives on
     the heap at an arbitrary address that the getter's global never learns
     about. Pattern scanning for the getter code correctly locates the global
     address, but reading from it always returns 0 — hence the MemoryReadError
