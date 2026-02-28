@@ -40,20 +40,20 @@ class ClientObject(CoreObject):
     async def try_get_deck_behavior(self) -> ClientDeckBehavior | None:
         """Get the player's active deck behavior.
 
-        Note: The DeckBehavior lives on the equipped deck ITEM, not on the
-        player CoreObject. This method searches equipment items for it.
+        Convenience shortcut. The DeckBehavior lives on the equipped deck
+        item (not on the player CoreObject), so this searches all equipped
+        items via CoreObject.search_behavior_by_name().
         """
         equip = await self.try_get_equipment_behavior()
         if not equip:
             return None
         for item in await equip.item_list():
             try:
-                for behavior in await item.inactive_behaviors():
-                    bname = await behavior.behavior_name()
-                    if bname == "BasicDeckBehavior":
-                        return ClientDeckBehavior(
-                            self.hook_handler, await behavior.read_base_address()
-                        )
+                behavior = await item.search_behavior_by_name("BasicDeckBehavior")
+                if behavior:
+                    return ClientDeckBehavior(
+                        self.hook_handler, await behavior.read_base_address()
+                    )
             except Exception:
                 continue
         return None
