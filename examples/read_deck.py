@@ -19,12 +19,10 @@ If no arguments are provided, the item card section is skipped.
 
 import argparse
 import asyncio
-import struct
 import sys
 from pathlib import Path
 
 from wizwalker import ClientHandler
-from wizwalker.constants import Primitive
 from wizwalker.memory.memory_objects.game_object_template import WizGameObjectTemplate
 
 # Optional katsuba import for WAD-based item card lookup
@@ -142,23 +140,9 @@ async def main(wad_path: Path | None = None, types_path: Path | None = None):
         # === Main Deck ===
         print("=== Main Deck ===")
         equip = await client_obj.try_get_equipment_behavior()
-        deck_behavior = None
-        if equip:
-            for item in await equip.item_list():
-                try:
-                    for behavior in await item.inactive_behaviors():
-                        if await behavior.behavior_name() == "BasicDeckBehavior":
-                            deck_behavior = behavior
-                            break
-                    if deck_behavior:
-                        break
-                except Exception:
-                    continue
+        deck = await client_obj.try_get_deck_behavior()
 
-        if deck_behavior:
-            from wizwalker.memory.memory_objects.deck_behavior import ClientDeckBehavior
-            deck_base = await deck_behavior.read_base_address()
-            deck = ClientDeckBehavior(deck_behavior.hook_handler, deck_base)
+        if deck:
 
             spells = await deck.spell_list()
             total = 0
@@ -176,23 +160,13 @@ async def main(wad_path: Path | None = None, types_path: Path | None = None):
 
             # === Excluded Item Cards (blacklist) ===
             print("=== Excluded Item Cards ===")
-            str_len = await deck_behavior.read_value_from_offset(0x98 + 16, Primitive.uint32)
-            if str_len > 0:
-                if str_len >= 16:
-                    data_ptr = await deck_behavior.read_value_from_offset(0x98, Primitive.uint64)
-                    raw = deck_behavior.hook_handler.process.read_bytes(data_ptr, str_len)
-                else:
-                    raw = deck_behavior.hook_handler.process.read_bytes(deck_base + 0x98, str_len)
-
-                count = struct.unpack_from("<H", raw, 0)[0]
+            exclusions = await deck.exclusion_list()
+            if exclusions:
                 total_excl = 0
-                for i in range(count):
-                    off = 2 + i * 6
-                    spell_id = struct.unpack_from("<I", raw, off)[0]
-                    qty = struct.unpack_from("<H", raw, off + 4)[0]
+                for spell_id, qty in exclusions:
                     total_excl += qty
                     print(f"  {spell_id} x{qty}")
-                print(f"  Total: {count} unique, {total_excl} excluded\n")
+                print(f"  Total: {len(exclusions)} unique, {total_excl} excluded\n")
             else:
                 print("  (none excluded)\n")
         else:
