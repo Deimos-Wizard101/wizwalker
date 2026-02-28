@@ -84,7 +84,6 @@ class ClientObject(CoreObject):
 
             return DynamicActorBody(self.hook_handler, addr)
 
-
     # helper method
     async def object_name(self) -> Optional[str]:
         """
