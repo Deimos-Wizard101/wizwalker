@@ -254,6 +254,12 @@ class Client:
         await self.hook_handler.activate_all_hooks(
             wait_for_ready=wait_for_ready, timeout=timeout
         )
+        try:
+            await self.hook_handler.activate_combat_actions()
+        except Exception as e:
+            # Combat actions are optional — don't break existing code
+            # if the pattern scan fails on a different game version
+            warnings.warn(f"Combat actions failed to activate: {e}")
 
     async def close(self):
         """
@@ -336,6 +342,130 @@ class Client:
             return False
         else:
             return duel_phase is not DuelPhase.ended
+
+    async def send_combat_flee(self):
+        """Flee from combat entirely without any UI interaction.
+
+        Sends a MSG_COMBATMOVE with MoveType=1 (Flee).
+        Leaves the battle entirely.
+
+        Raises:
+            RuntimeError: If combat actions are not activated
+        """
+        if self.hook_handler.combat_actions is None:
+            raise RuntimeError("Combat actions not activated")
+        await self.hook_handler.combat_actions.flee()
+
+    async def send_combat_pass(self):
+        """Pass the current combat turn without any UI interaction.
+
+        Sends a MSG_COMBATMOVE with MoveType=3 (Pass).
+        Skips the turn but stays in combat.
+
+        Raises:
+            RuntimeError: If combat actions are not activated
+        """
+        if self.hook_handler.combat_actions is None:
+            raise RuntimeError("Combat actions not activated")
+        await self.hook_handler.combat_actions.pass_turn()
+
+    async def send_combat_spell(self, hand_index: int, target: int):
+        """Cast a spell without any UI interaction.
+
+        Sends a MSG_COMBATMOVE message with MoveType=0 (Cast Spell).
+
+        Args:
+            hand_index: Index of the spell card in the player's hand
+                (0-based, left to right)
+            target: Target subcircle index (0-7)
+
+        Raises:
+            RuntimeError: If combat actions are not activated
+        """
+        if self.hook_handler.combat_actions is None:
+            raise RuntimeError("Combat actions not activated")
+        await self.hook_handler.combat_actions.cast_spell(hand_index, target)
+
+    async def send_combat_enchant(
+        self, enchant_index: int, target_index: int
+    ):
+        """Apply an enchantment card to a spell card in hand.
+
+        Args:
+            enchant_index: Index of the enchant card in hand
+            target_index: Index of the spell card to enchant
+
+        Raises:
+            RuntimeError: If combat actions are not activated
+        """
+        if self.hook_handler.combat_actions is None:
+            raise RuntimeError("Combat actions not activated")
+        await self.hook_handler.combat_actions.enchant_spell(
+            enchant_index, target_index
+        )
+
+    async def send_combat_discard(self, hand_index: int):
+        """Discard a card from hand without any UI interaction.
+
+        Sends a MSG_COMBATMOVE with MoveType=2 (Discard).
+
+        Args:
+            hand_index: Index of the card to discard (0-based, left to right)
+
+        Raises:
+            RuntimeError: If combat actions are not activated
+        """
+        if self.hook_handler.combat_actions is None:
+            raise RuntimeError("Combat actions not activated")
+        await self.hook_handler.combat_actions.discard_card(hand_index)
+
+    async def send_combat_fusion(
+        self, primary_index: int, secondary_index: int, fused_spell_id: int = 0
+    ):
+        """Fuse two spell cards together (spell fusion).
+
+        Args:
+            primary_index: Index of the primary spell card in hand
+            secondary_index: Index of the secondary spell card in hand
+            fused_spell_id: Template ID of the resulting fused spell (0 to auto)
+
+        Raises:
+            RuntimeError: If combat actions are not activated
+        """
+        if self.hook_handler.combat_actions is None:
+            raise RuntimeError("Combat actions not activated")
+        await self.hook_handler.combat_actions.fuse_spells(
+            primary_index, secondary_index, fused_spell_id
+        )
+
+    async def send_combat_draw(self):
+        """Draw a treasure card from the TC deck without any UI interaction.
+
+        Sends a MSG_COMBATDRAW message (no fields required).
+
+        Raises:
+            RuntimeError: If combat actions are not activated
+        """
+        if self.hook_handler.combat_actions is None:
+            raise RuntimeError("Combat actions not activated")
+        await self.hook_handler.combat_actions.draw_card()
+
+    async def send_pet_willcast(self, spell_name: str, target: int):
+        """Trigger a pet may-cast spell without any UI interaction.
+
+        Sends a MSG_PETWILLCAST message with the spell name and target.
+
+        Args:
+            spell_name: Name of the pet spell to cast (e.g. "Fire Cat")
+            target: Target subcircle index (0-7)
+
+        Raises:
+            RuntimeError: If combat actions are not activated or
+                SetString was not resolved during setup
+        """
+        if self.hook_handler.combat_actions is None:
+            raise RuntimeError("Combat actions not activated")
+        await self.hook_handler.combat_actions.pet_willcast(spell_name, target)
 
     async def is_loading(self) -> bool:
         """
