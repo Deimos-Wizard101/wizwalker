@@ -9,6 +9,8 @@ from loguru import logger
 
 from wizwalker import HookAlreadyActivated, HookNotActive, HookNotReady
 from .hooks import (
+    ChatHook,
+    ChatSendHook,
     ClientHook,
     MouselessCursorMoveHook,
     PlayerHook,
@@ -583,3 +585,86 @@ class HookHandler(MemoryReader):
         packed_position = struct.pack("<ii", x, y)
 
         await self.write_bytes(addr, packed_position)
+
+    async def activate_chat_hook(
+        self, *, wait_for_ready: bool = True, timeout: float = None
+    ):
+        """Activate the chat hook to capture the chat module pointer.
+
+        The hook fires on every incoming MSG_DirectedChat, capturing the
+        chat owner object and the current DML message pointer.
+
+        Keyword Args:
+            wait_for_ready: Wait for the chat owner pointer to be written
+            timeout: How long to wait (None for no timeout)
+        """
+        if self._check_if_hook_active(ChatHook):
+            raise HookAlreadyActivated("Chat")
+
+        await self._check_for_autobot()
+
+        chat_hook = ChatHook(self)
+        await chat_hook.hook()
+
+        self._active_hooks[ChatHook] = chat_hook
+        self._base_addrs["chat_owner"] = chat_hook.chat_owner_addr
+        self._base_addrs["chat_message"] = chat_hook.chat_message_addr
+
+        if wait_for_ready:
+            await self._wait_for_value(chat_hook.chat_owner_addr, timeout)
+
+    async def deactivate_chat_hook(self):
+        """Deactivate the chat hook."""
+        if not self._check_if_hook_active(ChatHook):
+            raise HookNotActive("Chat")
+
+        hook = self._active_hooks.pop(ChatHook)
+        await hook.unhook()
+
+        del self._base_addrs["chat_owner"]
+        del self._base_addrs["chat_message"]
+
+    async def read_chat_owner_base(self) -> int:
+        """Read the chat owner (chat module) base address.
+
+        Returns:
+            The chat module base address
+        """
+        return await self._read_hook_base_addr("chat_owner", "Chat")
+
+    async def read_chat_message_base(self) -> int:
+        """Read the current DML message pointer (transient, only valid during handler).
+
+        Returns:
+            The current DML message base address
+        """
+        return await self._read_hook_base_addr("chat_message", "Chat")
+
+    async def activate_chat_send_hook(self):
+        """Activate the chat send hook on the main game loop.
+
+        This hooks the game's main loop so that send_msg() executes
+        on the main thread where chat operations are safe.
+        """
+        if self._check_if_hook_active(ChatSendHook):
+            raise HookAlreadyActivated("Chat send")
+
+        await self._check_for_autobot()
+
+        hook = ChatSendHook(self)
+        await hook.hook()
+
+        self._active_hooks[ChatSendHook] = hook
+        self._base_addrs["send_trigger"] = hook.send_trigger
+        self._base_addrs["send_struct"] = hook.send_struct
+
+    async def deactivate_chat_send_hook(self):
+        """Deactivate the chat send hook."""
+        if not self._check_if_hook_active(ChatSendHook):
+            raise HookNotActive("Chat send")
+
+        hook = self._active_hooks.pop(ChatSendHook)
+        await hook.unhook()
+
+        del self._base_addrs["send_trigger"]
+        del self._base_addrs["send_struct"]
