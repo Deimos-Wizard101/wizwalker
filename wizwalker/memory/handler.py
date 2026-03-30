@@ -657,6 +657,8 @@ class HookHandler(MemoryReader):
         self._active_hooks[ChatSendHook] = hook
         self._base_addrs["send_trigger"] = hook.send_trigger
         self._base_addrs["send_struct"] = hook.send_struct
+        self._base_addrs["buddy_trigger"] = hook.buddy_trigger
+        self._base_addrs["buddy_obj"] = hook.buddy_obj
 
     async def deactivate_chat_send_hook(self):
         """Deactivate the chat send hook."""
@@ -668,3 +670,5 @@ class HookHandler(MemoryReader):
 
         del self._base_addrs["send_trigger"]
         del self._base_addrs["send_struct"]
+        del self._base_addrs["buddy_trigger"]
+        del self._base_addrs["buddy_obj"]

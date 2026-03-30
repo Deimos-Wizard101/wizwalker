@@ -2,8 +2,12 @@ import asyncio
 import struct
 
 from wizwalker.memory.memory_object import MemoryObject, DynamicMemoryObject
-from wizwalker.constants import Primitive
 
+
+# The buddy add function (FUN_141710e10) receives the target GID as
+# param_2 (a raw value). The hook stores it at buddy_obj+0xE0 and
+# reads it back into RDX before calling the function.
+_BUDDY_GID_OFFSET = 0xE0
 
 # DirectedChatRequest struct layout (param_2 of FUN_1416e5ac0):
 #
@@ -20,10 +24,9 @@ _MAX_SSO_WCHARS = 7
 class ChatOwner(MemoryObject):
     """The chat module object captured by ChatHook.
 
-    Provides send_msg() to whisper another player. The send executes
-    on the game's main thread via ChatSendHook, which calls the game's
-    own FUN_1416e5ac0 — keeping all validation, filtering, buddy checks,
-    and UI updates intact.
+    Provides send_msg() to whisper another player and add_player()
+    to send a buddy request. Both execute on the game's main thread
+    via ChatSendHook, calling the game's own validated functions.
     """
 
     async def read_base_address(self) -> int:
@@ -82,6 +85,46 @@ class ChatOwner(MemoryObject):
 
         raise RuntimeError("Chat send timed out — trigger was not cleared by hook")
 
+    async def add_player(self, target_gid: int):
+        """Send a buddy/friend request to a player.
+
+        Writes the target GID to the ChatSendHook's buddy_obj export
+        at offset 0xE0, then sets buddy_trigger. The main-thread hook
+        reads the GID, sets up a fake BuddyListManager with the
+        GameClient pointer, and calls FUN_141710e10.
+
+        Args:
+            target_gid: The target player's GID to send a friend request to
+
+        Raises:
+            RuntimeError: If ChatSendHook is not active
+        """
+        trigger_addr = self.hook_handler._base_addrs.get("buddy_trigger")
+        obj_addr = self.hook_handler._base_addrs.get("buddy_obj")
+        if trigger_addr is None or obj_addr is None:
+            raise RuntimeError(
+                "ChatSendHook not active. Call "
+                "hook_handler.activate_chat_send_hook() first."
+            )
+
+        # Write target GID at offset 0xE0 in the buddy_obj export.
+        await self.hook_handler.write_bytes(
+            obj_addr + _BUDDY_GID_OFFSET,
+            struct.pack("<Q", target_gid),
+        )
+
+        # Set trigger — the main thread hook picks this up next frame
+        await self.hook_handler.write_bytes(trigger_addr, b"\x01")
+
+        # Wait for the hook to clear the trigger
+        for _ in range(100):
+            await asyncio.sleep(0.05)
+            result = await self.hook_handler.read_bytes(trigger_addr, 1)
+            if result == b"\x00":
+                return
+
+        raise RuntimeError("Buddy add timed out — trigger was not cleared by hook")
+
 
 class DynamicChatOwner(DynamicMemoryObject, ChatOwner):
     pass
@@ -90,9 +133,9 @@ class DynamicChatOwner(DynamicMemoryObject, ChatOwner):
 class CurrentChatOwner(ChatOwner):
     """Reads the chat owner address from the ChatHook export.
 
-    Note: send_msg() does not require ChatHook — it uses
-    ChatSendHook + the GameClient from ClientHook instead.
-    The ChatHook is only needed for reading incoming message data.
+    Note: send_msg() and add_player() do not require ChatHook — they
+    use ChatSendHook instead. The ChatHook is only needed for reading
+    incoming message data.
     """
 
     async def read_base_address(self) -> int:
