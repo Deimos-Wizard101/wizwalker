@@ -589,13 +589,13 @@ class HookHandler(MemoryReader):
     async def activate_chat_hook(
         self, *, wait_for_ready: bool = True, timeout: float = None
     ):
-        """Activate the chat hook to capture the chat module pointer.
+        """Activate the chat hook to capture incoming directed chat messages.
 
-        The hook fires on every incoming MSG_DirectedChat, capturing the
-        chat owner object and the current DML message pointer.
+        The hook fires on every incoming MSG_DirectedChat, extracting the
+        sender's GID and message text to persistent export buffers.
 
         Keyword Args:
-            wait_for_ready: Wait for the chat owner pointer to be written
+            wait_for_ready: Wait for the first message to arrive
             timeout: How long to wait (None for no timeout)
         """
         if self._check_if_hook_active(ChatHook):
@@ -608,10 +608,13 @@ class HookHandler(MemoryReader):
 
         self._active_hooks[ChatHook] = chat_hook
         self._base_addrs["chat_owner"] = chat_hook.chat_owner_addr
-        self._base_addrs["chat_message"] = chat_hook.chat_message_addr
+        self._base_addrs["recv_source_gid"] = chat_hook.recv_source_gid
+        self._base_addrs["recv_message_buf"] = chat_hook.recv_message_buf
+        self._base_addrs["recv_message_len"] = chat_hook.recv_message_len
+        self._base_addrs["recv_counter"] = chat_hook.recv_counter
 
         if wait_for_ready:
-            await self._wait_for_value(chat_hook.chat_owner_addr, timeout)
+            await self._wait_for_value(chat_hook.recv_counter, timeout)
 
     async def deactivate_chat_hook(self):
         """Deactivate the chat hook."""
@@ -622,7 +625,10 @@ class HookHandler(MemoryReader):
         await hook.unhook()
 
         del self._base_addrs["chat_owner"]
-        del self._base_addrs["chat_message"]
+        del self._base_addrs["recv_source_gid"]
+        del self._base_addrs["recv_message_buf"]
+        del self._base_addrs["recv_message_len"]
+        del self._base_addrs["recv_counter"]
 
     async def read_chat_owner_base(self) -> int:
         """Read the chat owner (chat module) base address.
@@ -631,14 +637,6 @@ class HookHandler(MemoryReader):
             The chat module base address
         """
         return await self._read_hook_base_addr("chat_owner", "Chat")
-
-    async def read_chat_message_base(self) -> int:
-        """Read the current DML message pointer (transient, only valid during handler).
-
-        Returns:
-            The current DML message base address
-        """
-        return await self._read_hook_base_addr("chat_message", "Chat")
 
     async def activate_chat_send_hook(self):
         """Activate the chat send hook on the main game loop.

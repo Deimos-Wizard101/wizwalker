@@ -726,22 +726,25 @@ class MouselessCursorMoveHook(User32GetClassInfoBaseHook):
 
 
 class ChatHook(SimpleHook):
-    """Captures the chat module pointer when MSG_DirectedChat is processed.
+    """Captures incoming directed chat message data.
 
     Binary RE source: FUN_1416dbb30 (r794925) — MSG_DirectedChat handler.
 
-    At function entry:
-      RCX = chat owner object (the module that registered this handler)
-      RDX = DML game message (contains SourceID, SourceName, Message, etc.)
+    Hooks AFTER the handler has extracted all DML fields, at the point
+    where GetWideString just returned the Message wstring pointer in RAX
+    and SourceID is already stored at [RBP-0x80].
 
-    The hook captures the chat owner pointer so Python can access
-    the chat subsystem's state. It also captures the DML message
-    pointer for reading incoming message fields.
+    Hook point: func+0x379 (LEA RCX,[RBP-0x8], 4 bytes)
+    At this point:
+      RAX = pointer to std::wstring (Message from GetWideString)
+      [RBP-0x80] = SourceID (GID, 8 bytes)
+      RSI = chat owner object (saved from RCX at func entry)
 
-    Pattern matches a common prologue shared by ~10 handler functions.
-    Disambiguation: at func+0x7E only the DirectedChat handler has
-    MOV dword ptr [RBP-10h], 9 (C7 45 F0 09 00 00 00), which sets
-    a chat type discriminator field unique to this handler.
+    The hook copies SourceID and Message text to persistent exports
+    and increments a counter so Python can detect new messages.
+
+    Pattern: uses the function prologue (same as before) to find the
+    function, then hooks at func+0x379 instead of func+0x00.
     """
     pattern = (
         rb"\x48\x89\x5C\x24\x18"           # MOV [RSP+18h], RBX
@@ -757,11 +760,18 @@ class ChatHook(SimpleHook):
         rb"\x45\x33\xF6"                    # XOR R14D, R14D
     )
     exports = [
-        ("chat_owner_addr", 8),     # persistent: chat module pointer
-        ("chat_message_addr", 8),   # transient: current DML message pointer
+        ("chat_owner_addr", 8),        # persistent: chat owner (RSI)
+        ("recv_source_gid", 8),        # sender's GID
+        ("recv_message_buf", 160),     # message text (UTF-16LE, 80 wchars max)
+        ("recv_message_len", 8),       # wchar count
+        ("recv_counter", 8),           # increments on each message
     ]
-    instruction_length = 5
-    noops = 0
+    # Hook at func+0x379: LEA RCX,[RBP-0x8] (4 bytes) + CMP RCX,RAX (3 bytes)
+    # Both instructions must be replaced because a JMP is 5 bytes and
+    # the LEA is only 4 — the 5th byte would corrupt the CMP.
+    _HOOK_OFFSET = 0x379
+    instruction_length = 7   # 4 (LEA) + 3 (CMP) = 7 bytes
+    noops = 2                # 7 - 5 = 2 padding NOPs
 
     # The prologue pattern returns ~10 results from the pattern scan.
     # Of those ~10 results, only the DirectedChat handler has
@@ -782,7 +792,8 @@ class ChatHook(SimpleHook):
                 addr + self._DISAMBIG_OFFSET, len(self._DISAMBIG_BYTES)
             )
             if probe == self._DISAMBIG_BYTES:
-                return addr
+                # Hook at func+0x379, not at the prologue
+                return addr + self._HOOK_OFFSET
 
         from wizwalker import PatternFailed
         raise PatternFailed(
@@ -790,19 +801,112 @@ class ChatHook(SimpleHook):
             f"had type=9 marker at offset +{self._DISAMBIG_OFFSET:#x}"
         )
 
-    async def bytecode_generator(self, packed_exports):
-        # At entry: RCX = chat owner, RDX = DML message
-        # fmt: off
-        bytecode = (
-            b"\x50"                              # push rax
-            b"\x48\x89\xC8"                      # mov rax, rcx  (chat owner)
-            b"\x48\xA3" + packed_exports[0][1] + # mov [chat_owner_addr], rax
-            b"\x48\x89\xD0"                      # mov rax, rdx  (DML message)
-            b"\x48\xA3" + packed_exports[1][1] + # mov [chat_message_addr], rax
-            b"\x58"                              # pop rax
-            b"\x48\x89\x5C\x24\x18"             # original: MOV [RSP+18h], RBX
+    async def hook(self):
+        """Override to allocate enough space for the extraction bytecode."""
+        pattern, module = await self.get_pattern()
+
+        self.jump_address = await self.get_jump_address(pattern, module=module)
+        self.hook_address = await self.get_hook_address(200)
+
+        logger.debug(f"Got hook address {self.hook_address} in {type(self)}")
+        logger.debug(f"Got jump address {self.jump_address} in {type(self)}")
+
+        self.hook_bytecode = await self.get_hook_bytecode()
+        self.jump_bytecode = await self.get_jump_bytecode()
+
+        self.jump_original_bytecode = await self.read_bytes(
+            self.jump_address, len(self.jump_bytecode)
         )
+
+        await self.prehook()
+        await self.write_bytes(self.hook_address, self.hook_bytecode)
+        await self.write_bytes(self.jump_address, self.jump_bytecode)
+        await self.posthook()
+
+    async def bytecode_generator(self, packed_exports):
+        chat_owner  = packed_exports[0][1]
+        source_gid  = packed_exports[1][1]
+        message_buf = packed_exports[2][1]
+        message_len = packed_exports[3][1]
+        counter     = packed_exports[4][1]
+
+        # At hook point (func+0x379), register state:
+        #   RAX = wstring pointer (Message from GetWideString)
+        #   [RBP-0x80] = SourceID GID (8 bytes)
+        #   RSI = chat owner (saved from param_1 at func entry)
+
+        # fmt: off
+        preamble = (
+            # Save volatile registers
+            b"\x51"                              # push rcx
+            b"\x52"                              # push rdx
+            b"\x41\x50"                          # push r8
+            b"\x41\x51"                          # push r9
+
+            # RAX = wstring ptr from GetWideString
+
+            # Save chat owner (RSI → export)
+            b"\x50"                              # push rax
+            b"\x48\x89\xF0"                      # mov rax, rsi
+            b"\x48\xA3" + chat_owner +           # mov [chat_owner], rax
+            b"\x58"                              # pop rax
+
+            # Copy SourceID ([RBP-0x80] → export)
+            b"\x50"                              # push rax
+            b"\x48\x8B\x45\x80"                 # mov rax, [rbp-0x80]
+            b"\x48\xA3" + source_gid +           # mov [recv_source_gid], rax
+            b"\x58"                              # pop rax
+
+            # Save message length ([rax+0x10] → export)
+            b"\x50"                              # push rax
+            b"\x48\x8B\x40\x10"                 # mov rax, [rax+0x10]
+            b"\x48\xA3" + message_len +          # mov [recv_message_len], rax
+            b"\x58"                              # pop rax
+
+            # Get wstring data pointer into RDX
+            b"\x48\x8B\xD0"                      # mov rdx, rax (inline)
+            b"\x48\x83\x78\x18\x08"             # cmp [rax+0x18], 8
+            b"\x72\x03"                          # jb .copy
+            b"\x48\x8B\x10"                      # mov rdx, [rax] (heap)
+        )
+
+        # Copy 160 bytes (20 x 8-byte chunks) from RDX to export
+        # Use R8 as dest, R9 as counter, RCX as temp value
+        copy_loop = (
+            b"\x49\xB8" + message_buf +          # mov r8, &message_buf
+            b"\x41\xB9\x14\x00\x00\x00"         # mov r9d, 20 (iterations)
+            # .loop:
+            b"\x48\x8B\x0A"                      # mov rcx, [rdx]
+            b"\x49\x89\x08"                      # mov [r8], rcx
+            b"\x48\x83\xC2\x08"                 # add rdx, 8
+            b"\x49\x83\xC0\x08"                 # add r8, 8
+            b"\x41\xFF\xC9"                      # dec r9d
+            b"\x75\xED"                          # jnz .loop (-19 bytes back)
+        )
+
+        # Increment message counter
+        inc_counter = (
+            b"\x50"                              # push rax
+            b"\x48\xA1" + counter +              # mov rax, [recv_counter]
+            b"\x48\xFF\xC0"                      # inc rax
+            b"\x48\xA3" + counter +              # mov [recv_counter], rax
+            b"\x58"                              # pop rax
+        )
+
+        # Restore registers
+        restore = (
+            b"\x41\x59"                          # pop r9
+            b"\x41\x58"                          # pop r8
+            b"\x5A"                              # pop rdx
+            b"\x59"                              # pop rcx
+        )
+
+        # Original instructions: LEA RCX,[RBP-0x8] (4) + CMP RCX,RAX (3) = 7 bytes
+        original = await self.read_bytes(self.jump_address, 7)
+
+        bytecode = preamble + copy_loop + inc_counter + restore + original
         # fmt: on
+
         return bytecode
 
 

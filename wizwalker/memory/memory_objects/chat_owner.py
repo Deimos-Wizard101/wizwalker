@@ -187,6 +187,92 @@ class ChatOwner(MemoryObject):
 
         raise RuntimeError("Chat send timed out — trigger was not cleared by hook")
 
+    async def recv_message(self):
+        """Read the last received directed chat message.
+
+        Returns the sender GID, message text, and message counter.
+        The counter increments each time a new whisper arrives,
+        allowing callers to detect new messages by comparing against
+        a previously stored counter value.
+
+        Requires ChatHook to be active.
+
+        Returns:
+            Tuple of (sender_gid: int, message: str, counter: int)
+
+        Raises:
+            RuntimeError: If ChatHook is not active or no message received yet
+        """
+        gid_addr = self.hook_handler._base_addrs.get("recv_source_gid")
+        buf_addr = self.hook_handler._base_addrs.get("recv_message_buf")
+        len_addr = self.hook_handler._base_addrs.get("recv_message_len")
+        cnt_addr = self.hook_handler._base_addrs.get("recv_counter")
+        if any(a is None for a in (gid_addr, buf_addr, len_addr, cnt_addr)):
+            raise RuntimeError(
+                "ChatHook not active. Call "
+                "hook_handler.activate_chat_hook() first."
+            )
+
+        counter_bytes = await self.hook_handler.read_bytes(cnt_addr, 8)
+        counter = struct.unpack("<Q", counter_bytes)[0]
+        if counter == 0:
+            raise RuntimeError("No message received yet")
+
+        gid_bytes = await self.hook_handler.read_bytes(gid_addr, 8)
+        sender_gid = struct.unpack("<Q", gid_bytes)[0]
+
+        len_bytes = await self.hook_handler.read_bytes(len_addr, 8)
+        wchar_count = struct.unpack("<Q", len_bytes)[0]
+
+        # Read the message text (UTF-16LE), capped at export buffer size
+        byte_count = min(wchar_count * 2, 160)
+        msg_bytes = await self.hook_handler.read_bytes(buf_addr, byte_count)
+        message = msg_bytes.decode("utf-16-le", errors="replace")
+
+        return sender_gid, message, counter
+
+    async def wait_for_message(self, timeout: float = 10.0):
+        """Wait for a new directed chat message to arrive.
+
+        Polls the message counter until it changes from its current value,
+        indicating a new message was received.
+
+        Args:
+            timeout: Max seconds to wait (default 10)
+
+        Returns:
+            Tuple of (sender_gid: int, message: str, counter: int)
+
+        Raises:
+            RuntimeError: If ChatHook is not active
+            asyncio.TimeoutError: If no message arrives within timeout
+        """
+        cnt_addr = self.hook_handler._base_addrs.get("recv_counter")
+        if cnt_addr is None:
+            raise RuntimeError(
+                "ChatHook not active. Call "
+                "hook_handler.activate_chat_hook() first."
+            )
+
+        # Read current counter
+        counter_bytes = await self.hook_handler.read_bytes(cnt_addr, 8)
+        old_counter = struct.unpack("<Q", counter_bytes)[0]
+
+        # Poll until counter changes
+        elapsed = 0.0
+        interval = 0.05
+        while elapsed < timeout:
+            await asyncio.sleep(interval)
+            elapsed += interval
+            counter_bytes = await self.hook_handler.read_bytes(cnt_addr, 8)
+            new_counter = struct.unpack("<Q", counter_bytes)[0]
+            if new_counter != old_counter:
+                return await self.recv_message()
+
+        raise asyncio.TimeoutError(
+            f"No message received within {timeout} seconds"
+        )
+
     async def add_player(self, target_gid: int):
         """Send a buddy/friend request to a player.
 

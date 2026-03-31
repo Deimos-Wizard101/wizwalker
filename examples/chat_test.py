@@ -35,10 +35,15 @@ async def main():
         print("Activating chat send hook...")
         await client.hook_handler.activate_chat_send_hook()
 
+        print("Activating chat receive hook...")
+        await client.hook_handler.activate_chat_hook(wait_for_ready=False)
+
         print("\n=== Chat & Buddy Test CLI ===")
         print("  1      - Get your GID")
         print("  2      - Send directed chat to a GID")
         print("  3      - Send buddy request to a GID")
+        print("  4      - Wait for incoming whisper")
+        print("  5      - Read last received whisper")
         print("  Ctrl+C - Exit\n")
 
         while True:
@@ -91,13 +96,34 @@ async def main():
                 except Exception as e:
                     print(f"  Failed: {e}")
 
+            elif choice == "4":
+                print("  Waiting for incoming whisper (10s timeout)...")
+                try:
+                    sender, msg, cnt = await client.chat_owner.wait_for_message(10.0)
+                    print(f"  From {sender}: {msg!r} (msg #{cnt})")
+                except asyncio.TimeoutError:
+                    print("  No message received within timeout")
+                except Exception as e:
+                    print(f"  Error: {e}")
+
+            elif choice == "5":
+                try:
+                    sender, msg, cnt = await client.chat_owner.recv_message()
+                    print(f"  From {sender}: {msg!r} (msg #{cnt})")
+                except Exception as e:
+                    print(f"  Error: {e}")
+
             else:
-                print("  Unknown option. Use 1, 2, 3, or Ctrl+C.")
+                print("  Unknown option. Use 1-5 or Ctrl+C.")
 
     except KeyboardInterrupt:
         print("\nCtrl+C received")
     finally:
         print("Unhooking...")
+        try:
+            await client.hook_handler.deactivate_chat_hook()
+        except Exception:
+            pass
         try:
             await client.hook_handler.deactivate_chat_send_hook()
         except Exception:
