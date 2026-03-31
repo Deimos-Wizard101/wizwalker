@@ -164,11 +164,13 @@ class ChatOwner(MemoryObject):
         heap_ptr = await self._alloc_game_heap(len(wchars) + 2)
         await self.hook_handler.write_bytes(heap_ptr, wchars + b"\x00\x00")
 
-        # Build the DirectedChatRequest struct
+        # Build the DirectedChatRequest struct.
+        # Capacity must be > 7 so the game reads from the heap pointer
+        # at offset 0x00 instead of treating it as inline SSO data.
         struct_data = bytearray(_STRUCT_SIZE)
         struct.pack_into("<Q", struct_data, 0x00, heap_ptr)
         struct.pack_into("<Q", struct_data, 0x10, wchar_count)
-        struct.pack_into("<Q", struct_data, 0x18, wchar_count)
+        struct.pack_into("<Q", struct_data, 0x18, max(wchar_count, 8))
         struct.pack_into("<Q", struct_data, 0x20, target_gid)
 
         # Write struct to the hook's export buffer
