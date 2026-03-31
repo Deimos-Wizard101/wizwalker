@@ -18,7 +18,15 @@ _BUDDY_GID_OFFSET = 0xE0
 #   0x18  uint64 capacity   (<=7 means SSO inline, >7 means heap ptr at 0x00)
 #   0x20  uint64 target_id  (GID)
 _STRUCT_SIZE = 0x28
-_MAX_SSO_WCHARS = 7
+
+# The game allows messages longer than 79 characters but when the
+# server relays that message to another client it looks to be capped
+# at 79 characters.
+_MAX_MESSAGE_WCHARS = 79
+
+# Offset from the send_directed_chat function (FUN_1416e5ac0) start
+# to the CALL operator_new instruction (E8 <rel32>).
+_OPERATOR_NEW_CALL_OFFSET = 0xF4
 
 
 class ChatOwner(MemoryObject):
@@ -32,6 +40,86 @@ class ChatOwner(MemoryObject):
     async def read_base_address(self) -> int:
         raise NotImplementedError()
 
+    async def _resolve_operator_new(self) -> int:
+        """Resolve the game's operator new address, cached.
+
+        Extracted from the CALL at send_func + 0xF4 inside
+        FUN_1416e5ac0. This is the same allocator the game uses
+        for SSO heap strings, so operator delete can safely free it.
+        """
+        cache_key = "_operator_new_addr"
+        cached = getattr(self.hook_handler, cache_key, None)
+        if cached is not None:
+            return cached
+
+        # Get the send function address from the ChatSendHook
+        from wizwalker.memory.hooks import ChatSendHook
+        hook = self.hook_handler._active_hooks.get(ChatSendHook)
+        if hook is None:
+            raise RuntimeError("ChatSendHook not active")
+
+        send_func = await hook._resolve_send_func()
+
+        # Read the E8 rel32 CALL at send_func + 0xF4
+        call_addr = send_func + _OPERATOR_NEW_CALL_OFFSET
+        rel32_bytes = await self.hook_handler.read_bytes(call_addr + 1, 4)
+        rel32 = struct.unpack("<i", rel32_bytes)[0]
+        operator_new = call_addr + 5 + rel32
+
+        setattr(self.hook_handler, cache_key, operator_new)
+        return operator_new
+
+    async def _alloc_game_heap(self, size: int) -> int:
+        """Allocate memory using the game's operator new.
+
+        This memory can be safely freed by the game's operator delete
+        (used by the wstring destructor). Uses a minimal internal
+        helper executed via start_thread.
+
+        Args:
+            size: Number of bytes to allocate
+
+        Returns:
+            Address of the allocated buffer in the game process
+        """
+        operator_new = await self._resolve_operator_new()
+
+        # Allocate a slot to receive the result pointer
+        result_addr = await self.hook_handler.allocate(8)
+
+        # Build a minimal helper:
+        #   sub rsp, 0x28       ; shadow space + alignment
+        #   mov ecx, <size>     ; param for operator new
+        #   mov rax, <op_new>   ; operator new address
+        #   call rax            ; rax = allocated buffer
+        #   mov [result], rax   ; store result
+        #   add rsp, 0x28
+        #   ret
+        q = lambda v: struct.pack("<Q", v)
+        helper = (
+            b"\x48\x81\xEC\x28\x00\x00\x00"
+            b"\xB9" + struct.pack("<I", size) +
+            b"\x48\xB8" + q(operator_new) +
+            b"\xFF\xD0"
+            b"\x48\xA3" + q(result_addr) +
+            b"\x48\x81\xC4\x28\x00\x00\x00"
+            b"\xC3"
+        )
+
+        helper_addr = await self.hook_handler.allocate(len(helper))
+        await self.hook_handler.write_bytes(helper_addr, helper)
+
+        try:
+            await self.hook_handler.start_thread(helper_addr)
+            result_bytes = await self.hook_handler.read_bytes(result_addr, 8)
+            heap_ptr = struct.unpack("<Q", result_bytes)[0]
+            if heap_ptr == 0:
+                raise RuntimeError("operator new returned NULL")
+            return heap_ptr
+        finally:
+            await self.hook_handler.free(helper_addr)
+            await self.hook_handler.free(result_addr)
+
     async def send_msg(self, message: str, target_gid: int):
         """Send a directed chat (whisper) to a player.
 
@@ -40,19 +128,25 @@ class ChatOwner(MemoryObject):
         main thread each frame) picks it up and calls the game's own
         send_directed_chat function.
 
+        For messages <= 7 characters, the wstring is stored inline (SSO).
+        For longer messages, a heap buffer is allocated using the game's
+        own operator new so the destructor can safely free it.
+
         Args:
-            message: The chat message text (max 7 characters for now)
+            message: The chat message text
             target_gid: The target player's GID
 
         Raises:
-            ValueError: If message exceeds 7 characters
+            ValueError: If message exceeds max length
             RuntimeError: If ChatSendHook is not active
         """
-        if len(message) > _MAX_SSO_WCHARS:
+        if len(message) > _MAX_MESSAGE_WCHARS:
             raise ValueError(
-                f"Message too long ({len(message)} chars, max {_MAX_SSO_WCHARS}). "
-                f"Longer messages require heap-allocated wstrings (not yet implemented)."
+                f"Message too long ({len(message)} chars, max {_MAX_MESSAGE_WCHARS})"
             )
+
+        if not message:
+            raise ValueError("Message cannot be empty")
 
         trigger_addr = self.hook_handler._base_addrs.get("send_trigger")
         struct_addr = self.hook_handler._base_addrs.get("send_struct")
@@ -62,13 +156,20 @@ class ChatOwner(MemoryObject):
                 "hook_handler.activate_chat_send_hook() first."
             )
 
-        # Build the DirectedChatRequest struct
         wchars = message.encode("utf-16-le")
+        wchar_count = len(message)
+
+        # Allocate the wstring buffer via the game's operator new so
+        # the destructor can safely call operator delete after send.
+        heap_ptr = await self._alloc_game_heap(len(wchars) + 2)
+        await self.hook_handler.write_bytes(heap_ptr, wchars + b"\x00\x00")
+
+        # Build the DirectedChatRequest struct
         struct_data = bytearray(_STRUCT_SIZE)
-        struct_data[0x00:0x00 + len(wchars)] = wchars   # inline SSO
-        struct.pack_into("<Q", struct_data, 0x10, len(message))  # size
-        struct.pack_into("<Q", struct_data, 0x18, 7)             # capacity (SSO)
-        struct.pack_into("<Q", struct_data, 0x20, target_gid)    # target GID
+        struct.pack_into("<Q", struct_data, 0x00, heap_ptr)
+        struct.pack_into("<Q", struct_data, 0x10, wchar_count)
+        struct.pack_into("<Q", struct_data, 0x18, wchar_count)
+        struct.pack_into("<Q", struct_data, 0x20, target_gid)
 
         # Write struct to the hook's export buffer
         await self.hook_handler.write_bytes(struct_addr, bytes(struct_data))
@@ -76,7 +177,8 @@ class ChatOwner(MemoryObject):
         # Set trigger — the main thread hook picks this up next frame
         await self.hook_handler.write_bytes(trigger_addr, b"\x01")
 
-        # Wait for the hook to clear the trigger (send complete)
+        # Wait for the hook to clear the trigger (send complete).
+        # The game's destructor handles freeing any heap buffer.
         for _ in range(100):  # ~5 seconds at 20 FPS
             await asyncio.sleep(0.05)
             result = await self.hook_handler.read_bytes(trigger_addr, 1)
