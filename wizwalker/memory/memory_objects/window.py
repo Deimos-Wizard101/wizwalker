@@ -368,7 +368,7 @@ class SpellListControlSpellEntry(DynamicMemoryObject):
         return await self.read_value_from_offset(0x14, Primitive.uint32)
 
     async def enabled(self) -> bool:
-        return bool(await self.read_value_from_offset(0xA0, Primitive.uint8))
+        return bool(await self.read_value_from_offset(0x70, Primitive.uint8))
 
     async def _read_vector(self, address: int, size: int = 3, data_type: Primitive = Primitive.float32):
         type_str = data_type.value.format.replace("<", "")
@@ -421,7 +421,7 @@ class SpellListControl(Window):
         raise NotImplementedError()
 
     async def spell_entries(self) -> List[SpellListControlSpellEntry]:
-        return await self.read_inlined_vector(0x280, 0xA8, SpellListControlSpellEntry)
+        return await self.read_inlined_vector(0x280, 0x78, SpellListControlSpellEntry)
 
     async def card_size_horizontal(self) -> int:
         return await self.read_value_from_offset(0x30C, Primitive.uint32)
