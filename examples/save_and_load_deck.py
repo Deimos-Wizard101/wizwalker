@@ -6,8 +6,8 @@ Prerequisites:
   - Character must be in a safe location (not in combat)
 
 Usage:
-  py test_deck_save_load.py
-  py test_deck_save_load.py --save-path my_deck.json
+  py save_and_load_deck.py
+  py save_and_load_deck.py --save-path my_deck.json
 """
 
 import asyncio
