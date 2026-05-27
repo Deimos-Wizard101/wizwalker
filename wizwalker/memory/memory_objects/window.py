@@ -401,19 +401,19 @@ class DeckListControl(Window):
         raise NotImplementedError()
 
     async def spell_entries(self) -> List[DeckListControlSpellEntry]:
-        return await self.read_inlined_vector(0x300, 0x28, DeckListControlSpellEntry)
+        return await self.read_inlined_vector(0x280, 0x28, DeckListControlSpellEntry)
 
     async def card_size_horizontal(self) -> int:
-        return await self.read_value_from_offset(0x324, Primitive.uint32)
+        return await self.read_value_from_offset(0x2A4, Primitive.uint32)
 
     async def card_size_vertical(self) -> int:
-        return await self.read_value_from_offset(0x328, Primitive.uint32)
+        return await self.read_value_from_offset(0x2A8, Primitive.uint32)
 
     async def card_spacing(self) -> int:
-        return await self.read_value_from_offset(0x32C, Primitive.uint32)
+        return await self.read_value_from_offset(0x2AC, Primitive.uint32)
 
     async def card_spacing_vertical_adjust(self) -> int:
-        return await self.read_value_from_offset(0x330, Primitive.uint32)
+        return await self.read_value_from_offset(0x2B0, Primitive.uint32)
 
 
 class SpellListControl(Window):
