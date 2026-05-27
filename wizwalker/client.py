@@ -438,6 +438,11 @@ class Client:
         if (behavior := await self.client_object.search_behavior_by_name("PetOwnerBehavior")) is not None:
             return await behavior.read_value_from_offset(132, Primitive.int32)
         
+        if (maybe_energy_text := await self.root_window.get_windows_with_name("textEnergy")) is not None:
+            energy_text = await maybe_energy_text[0].maybe_text()		
+            energy_text = energy_text.replace("<center>", "").replace("</center>", "")
+            return int(energy_text)
+        
         return None
 
     def login(self, username: str, password: str):
@@ -706,7 +711,7 @@ class Client:
                 b"\x48\xBA" + packed_new_camera_address +  # mov rdx, new_cam_addr
                 b"\x49\xC7\xC0\x01\x00\x00\x00"  # mov r8, 0x1
                 b"\x48\x8B\x01"  # mov rax, [rcx]
-                b"\x48\x8B\x80\x70\x04\x00\x00"  # mov rax, [rax+0x470]
+                b"\x48\x8B\x80\x78\x04\x00\x00"  # mov rax, [rax+0x478]
                 b"\x49\x89\xC1"  # mov r9, rax
                 b"\xFF\xD0"  # call rax
 
