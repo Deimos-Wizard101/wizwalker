@@ -334,9 +334,36 @@ class Window(PropertyClass):
     async def write_parent_offset(self, parent_offset: tuple):
         await self.write_vector(176, parent_offset, 4, Primitive.int32)
 
-    async def is_control_grayed(self):
+    async def neighbor_left(self) -> str:
+        return await self.read_string_from_offset(200)
+
+    async def write_neighbor_left(self, neighbor_left: str):
+        await self.write_string_to_offset(200, neighbor_left)
+
+    async def neighbor_top(self) -> str:
+        return await self.read_string_from_offset(232)
+
+    async def write_neighbor_top(self, neighbor_top: str):
+        await self.write_string_to_offset(232, neighbor_top)
+
+    async def neighbor_right(self) -> str:
+        return await self.read_string_from_offset(264)
+
+    async def write_neighbor_right(self, neighbor_right: str):
+        await self.write_string_to_offset(264, neighbor_right)
+
+    async def neighbor_bottom(self) -> str:
+        return await self.read_string_from_offset(296)
+
+    async def write_neighbor_bottom(self, neighbor_bottom: str):
+        await self.write_string_to_offset(296, neighbor_bottom)
+
+    async def is_control_grayed(self) -> bool:
         # Note this is from "class ControlButton", base class is window so it works. Likely should have its own class - Click
         return await self.read_value_from_offset(808, Primitive.bool)
+
+    async def maybe_chat_channel_is_active(self) -> bool:
+        return await self.read_value_from_offset(1016, Primitive.bool)
 
 
 class DeckListControlSpellEntry(DynamicMemoryObject):
