@@ -166,7 +166,12 @@ class Window(PropertyClass):
     async def maybe_text(self, *, check_type: bool = False) -> str:
         # TODO: see if all types with .text have Control prefix
         #  and if so check that they have it
-        base_address = await self.read_base_address() + 712
+        offset = 712
+
+        if await self.maybe_read_type_name() == "ControlButton":
+            offset = 736
+
+        base_address = await self.read_base_address() + offset
         string_len = await self.read_typed(base_address + 16, Primitive.int32)
         if string_len == 0:
             return ""
@@ -188,7 +193,12 @@ class Window(PropertyClass):
         """
         Writing to this when there isn't actually a .text could crash
         """
-        address = await self.read_base_address() + 712
+        offset = 712
+
+        if await self.maybe_read_type_name() == "ControlButton":
+            offset = 736
+
+        address = await self.read_base_address() + offset
         string_len_addr = address + 16
         encoded = text.encode("utf-16-le")
         # len(encoded) instead of string bc it can be larger in some encodings
