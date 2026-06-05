@@ -193,10 +193,10 @@ class Window(PropertyClass):
         """
         Writing to this when there isn't actually a .text could crash
         """
-        offset = 712
+        offset = 736
 
-        if await self.maybe_read_type_name() == "ControlButton":
-            offset = 736
+        if await self.maybe_read_type_name() == "ControlText":
+            offset = 712
 
         address = await self.read_base_address() + offset
         string_len_addr = address + 16
