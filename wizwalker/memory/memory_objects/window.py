@@ -166,10 +166,10 @@ class Window(PropertyClass):
     async def maybe_text(self, *, check_type: bool = False) -> str:
         # TODO: see if all types with .text have Control prefix
         #  and if so check that they have it
-        offset = 712
+        offset = 736
 
-        if await self.maybe_read_type_name() == "ControlButton":
-            offset = 736
+        if await self.maybe_read_type_name() == "ControlText":
+            offset = 712
 
         base_address = await self.read_base_address() + offset
         string_len = await self.read_typed(base_address + 16, Primitive.int32)
