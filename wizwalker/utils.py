@@ -5,7 +5,6 @@ import io
 import math
 import struct
 import subprocess
-import contextlib
 
 # noinspection PyCompatibility
 import winreg
@@ -16,7 +15,7 @@ from typing import Any, Callable, Iterable, List, Optional
 import appdirs
 
 from wizwalker import ExceptionalTimeout
-from wizwalker.constants import Keycode, kernel32, user32, gdi32, WM_KEYDOWN, WM_KEYUP
+from wizwalker.constants import Keycode, kernel32, user32, gdi32
 
 
 DEFAULT_INSTALL = "C:/ProgramData/KingsIsle Entertainment/Wizard101"
@@ -264,15 +263,22 @@ def get_wiz_install() -> Path:
         raise Exception("Wizard101 install not found.")
 
 
-def start_instance():
+def start_instance(is_steam: bool = False):
     """
     Starts a wizard101 instance
     """
     location = get_wiz_install()
-    subprocess.Popen(
-        rf"{location}\Bin\WizardGraphicalClient.exe -L login.us.wizard101.com 12000",
-        cwd=rf"{location}\Bin",
-    )
+    if is_steam:
+        subprocess.Popen(
+            rf"{location}\Bin\WizardGraphicalClient.exe -L login.us.wizard101.com 12000 -ST",
+            cwd=rf"{location}\Bin",
+        )
+        
+    else:
+        subprocess.Popen(
+            rf"{location}\Bin\WizardGraphicalClient.exe -L login.us.wizard101.com 12000",
+            cwd=rf"{location}\Bin",
+        )
 
 
 def instance_login(window_handle: int, username: str, password: str):
@@ -307,7 +313,7 @@ def instance_login(window_handle: int, username: str, password: str):
 # --- [cancelButton] ControlButton
 # --- [title1] ControlText
 # --- [loginName] ControlEdit
-async def start_instances_with_login(instance_number: int, logins: Iterable, wait_for_ready=True):
+async def start_instances_with_login(instance_number: int, logins: Iterable, wait_for_ready=True, is_steam: bool = True):
     """
     Start a number of instances and login to them with logins
 
@@ -318,7 +324,7 @@ async def start_instances_with_login(instance_number: int, logins: Iterable, wai
     start_handles = set(get_all_wizard_handles())
 
     for _ in range(instance_number):
-        start_instance()
+        start_instance(is_steam=is_steam)
 
     # TODO: have way to properly check if instances are on login screen
     # waiting for instances to start
@@ -837,21 +843,13 @@ async def send_hotkey(window_handle: int, modifers: List[Keycode], key: Keycode)
         key: The key to press
     """
     for modifier in modifers:
-        _send_keydown(window_handle, modifier)
+        user32.SendMessageW(window_handle, 0x100, modifier.value, 0)
 
-    _send_keydown(window_handle, key)
-    _send_keyup(window_handle, key)
+    user32.SendMessageW(window_handle, 0x100, key.value, 0)
+    user32.SendMessageW(window_handle, 0x101, key.value, 0)
 
     for modifier in modifers:
-        _send_keyup(window_handle, modifier)
-
-
-def _send_keydown(window_handle: int, key: Keycode):
-    user32.SendMessageW(window_handle, WM_KEYDOWN, key.value, 0)
-
-
-def _send_keyup(window_handle: int, key: Keycode):
-    user32.SendMessageW(window_handle, WM_KEYUP, key.value, 0)
+        user32.SendMessageW(window_handle, 0x101, modifier.value, 0)
 
 
 async def timed_send_key(window_handle: int, key: Keycode, seconds: float):
@@ -864,18 +862,14 @@ async def timed_send_key(window_handle: int, key: Keycode, seconds: float):
         seconds: Number of seconds to send the key
     """
     keydown_task = asyncio.create_task(_send_keydown_forever(window_handle, key))
-    try:
-        await asyncio.sleep(seconds)
-    finally:
-        keydown_task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await keydown_task
-        _send_keyup(window_handle, key)
+    await asyncio.sleep(seconds)
+    keydown_task.cancel()
+    user32.SendMessageW(window_handle, 0x101, key.value, 0)
 
 
 async def _send_keydown_forever(window_handle: int, key: Keycode):
     while True:
-        _send_keydown(window_handle, key)
+        user32.SendMessageW(window_handle, 0x100, key.value, 0)
         await asyncio.sleep(0.05)
 
 # TODO: Can replace this with more generic one if needed, but only here for camera maths
