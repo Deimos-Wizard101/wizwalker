@@ -531,6 +531,28 @@ class MovementTeleportHook(SimpleHook):
         self._set_page_protection(jes[0], self._old_je_page_protection)
 
 
+class DropsToggleHook(SimpleHook):
+    pattern = rb"\x4C\x8B\xDC\x48\x83\xEC\x68\x48\x8B\x05...." \
+              rb"\x48\x33\xC4\x48\x89\x44\x24.\x48\x8D\x05...."
+
+    instruction_length = 7
+    exports = [("disable_drops_bool", 1)]
+    noops = 2
+
+    async def bytecode_generator(self, packed_exports):
+        return (
+            b"\x50" # push rax
+            b"\xA0" + packed_exports[0][1] + # mov al,[disable_drops_bool]
+            b"\x84\xC0" # test al,al
+            b"\x58" # pop rax
+            b"\x0F\x84\x04\x00\x00\x00" # je down 4
+            b"\x48\x31\xC0" # xor rax,rax
+            b"\xC3" # ret
+            b"\x4C\x8B\xDC" # mov r11,rsp (original bytes)
+            b"\x48\x83\xEC\x68" # sub rsp,68 (original bytes)
+        )
+
+
 # TODO: fix this hacky class
 class User32GetClassInfoBaseHook(AutoBotBaseHook):
     """
