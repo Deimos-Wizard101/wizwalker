@@ -44,33 +44,32 @@ from .adventure_party_list import DynamicAdventurePartyList
 
 _EXE_NAME = "WizardGraphicalClient.exe"
 
-# Constructor triple-vtable-write pattern (patch-survivable).
+# Constructor triple-vtable-write pattern.
 #
 # The SSM constructor writes three vtable pointers in consecutive
 # LEA RAX,[rip+disp32] / MOV pairs immediately after base-class init:
 #
 #   LEA RAX, [rip+disp32]    ; main vtable (obj+0x00)
-#   MOV [RDI], RAX
+#   MOV [RSI], RAX
 #   LEA RAX, [rip+disp32]    ; MessageHandler sub-vtable (obj+0x48)
-#   MOV [RSI], RAX            ; RSI was set to RDI+0x48 earlier
+#   MOV [R14], RAX            ; R14 was set to RSI+0x48 earlier
 #   LEA RAX, [rip+disp32]    ; third sub-vtable (obj+0x68)
-#   MOV [RDI+0x68], RAX
+#   MOV [RSI+0x68], RAX
 #
-# The fixed opcode bytes are stable across patches — only the disp32
-# operands change as vtables shift in .rdata. This three-write sequence
-# (targeting [RDI], [RSI], and [RDI+0x68]) is unique to the SSM
+# Registers and disp32 operands follow the current build. This three-write sequence
+# (targeting [RSI], [R14], and [RSI+0x68]) is unique to the SSM
 # constructor and serves as a reliable anchor for extracting the vtable
 # address at runtime.
 _SSM_CONSTRUCTOR_PATTERN = (
     b"\x48\x8D\x05"        # LEA RAX, [rip+disp32]  (main vtable)
     b"...."                 # disp32 wildcard
-    b"\x48\x89\x07"        # MOV [RDI], RAX
+    b"\x48\x89\x06"        # MOV [RSI], RAX
     b"\x48\x8D\x05"        # LEA RAX, [rip+disp32]  (secondary vtable)
     b"...."                 # disp32 wildcard
-    b"\x48\x89\x06"        # MOV [RSI], RAX
+    b"\x49\x89\x06"        # MOV [R14], RAX
     b"\x48\x8D\x05"        # LEA RAX, [rip+disp32]  (third vtable)
     b"...."                 # disp32 wildcard
-    b"\x48\x89\x47\x68"    # MOV [RDI+0x68], RAX
+    b"\x48\x89\x46\x68"    # MOV [RSI+0x68], RAX
 )
 
 
@@ -262,13 +261,12 @@ class CurrentSocialSystemsManager(SocialSystemsManager):
     The SSM constructor writes three vtable pointers in three consecutive
     LEA RAX,[rip+disp32] / MOV pairs:
 
-      1. LEA RAX,[rip+disp32]; MOV [RDI],RAX       — main vtable at +0x00
-      2. LEA RAX,[rip+disp32]; MOV [RSI],RAX       — sub-vtable at +0x48
-      3. LEA RAX,[rip+disp32]; MOV [RDI+0x68],RAX  — sub-vtable at +0x68
+      1. LEA RAX,[rip+disp32]; MOV [RSI],RAX       — main vtable at +0x00
+      2. LEA RAX,[rip+disp32]; MOV [R14],RAX       — sub-vtable at +0x48
+      3. LEA RAX,[rip+disp32]; MOV [RSI+0x68],RAX  — sub-vtable at +0x68
 
-    This triple-write pattern is unique in the binary. The fixed opcode bytes
-    (LEA/MOV encodings, target registers, displacement) are stable across
-    patches — only the disp32 operands change as vtables shift in .rdata.
+    This triple-write pattern identifies the constructor in the current build.
+    Registers and disp32 operands must be rechecked after updates.
 
     From the match we extract the first LEA's disp32 to compute the main
     vtable address, then scan process memory for an 8-byte pointer to that

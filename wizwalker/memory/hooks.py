@@ -267,7 +267,7 @@ class QuestHook(SimpleHook):
 
 class ClientHook(SimpleHook):
     pattern = (
-        rb"\x18\x48......\x48\x8B\x7C\x24\x38\x48\x85\xFF\x74\x29\x8B\xC6\xF0\x0F\xC1\x47\x08\x83\xF8\x01\x75\x1D"
+        rb"\x18\x48\x8B\x9B\xC0\x01\x00\x00\x48\x8B\x7C\x24\x40\x48\x85\xFF\x74\x29\x8B\xC6\xF0\x0F\xC1\x47\x08\x83\xF8\x01\x75\x1D"
         rb"\x48\x8B\x07\x48\x8B\xCF\xFF\x50\x08\xF0\x0F\xC1\x77\x0C"
     )
     exports = [("current_client_addr", 8)]
@@ -298,7 +298,10 @@ class ClientHook(SimpleHook):
 
 
 class RootWindowHook(SimpleHook):
-    pattern = rb".......\x48\x8B\x01.......\xFF\x50\x70\x84"
+    pattern = (
+        rb"\x49\x8B\x8F\xD8\x00\x00\x00\x48\x8B\x01"
+        rb"\x49\x8B\x97\xC8\x00\x00\x00\xFF\x50\x70\x84"
+    )
     instruction_length = 7
     noops = 2
     exports = [("current_root_window_addr", 8)]
@@ -307,10 +310,10 @@ class RootWindowHook(SimpleHook):
         # fmt: off
         bytecode = (
             b"\x50"  # push rax
-            b"\x49\x8B\x85\xD8\x00\x00\x00"  # mov rax,[r13+D8]
+            b"\x49\x8B\x87\xD8\x00\x00\x00"  # mov rax,[r15+D8]
             b"\x48\xA3" + packed_exports[0][1] +  # mov [current_root_window_addr], rax
             b"\x58"  # pop rax
-            b"\x49\x8B\x8D\xD8\x00\x00\x00"  # original instruction
+            b"\x49\x8B\x8F\xD8\x00\x00\x00"  # original instruction
         )
         # fmt: on
 
@@ -338,14 +341,14 @@ class RenderContextHook(SimpleHook):
 
 
 class MovementTeleportHook(SimpleHook):
-    pattern = rb"\x57\x48\x83\xEC.\x48\x8B\x99...." \
-              rb"\x48\x85\xDB\x74.\x4C\x8B\x43.\x48\x8B\x5B"\
-              rb".\x48\x85\xDB\x74.\xF0\xFF\x43.\x4D\x85" \
-              rb"\xC0\x74.\xF2\x0F\x10\x02\xF2\x41\x0F\x11\x40" \
-              rb".\x8B\x42.\x41\x89\x40.\x41\xC6\x80."
+    pattern = (
+        rb"\x40\x57\x48\x83\xEC\x30\x48\xC7\x44\x24\x20\xFE\xFF\xFF\xFF"
+        rb"\x48\x89\x5C\x24\x40\x48\x8B\x99\xB8\x01\x00\x00\x48\x85\xDB"
+        rb"\x74.\x4C\x8B\x43\x70\x48\x8B\x5B\x78"
+    )
 
-    instruction_length = 5
-    noops = 0
+    instruction_length = 6
+    noops = 1
     # position vector = 12 + 1 for update bool + 8 for target object address
     exports = [("teleport_helper", 21)]
 
@@ -390,12 +393,12 @@ class MovementTeleportHook(SimpleHook):
         target_address = jes[0]
 
         inside_event_je_addr = await self.pattern_scan(
-            rb"\x74.\xF3\x0F\x10\x55\xA8",
+            rb"\x74.\xF3\x0F\x10\x55\x90\xF3\x0F\x58\x54\x24\x48",
             module="WizardGraphicalClient.exe",
         )
         
         event_dispatch_je_addr = await self.pattern_scan(
-            rb"\x74.\xF3\x0F\x10\x44\x24\x54\xF3\x0F",
+            rb"\x74.\xF3\x0F\x10\x44\x24\x58\xF3\x0F\x11\x44\x24\x70",
             module="WizardGraphicalClient.exe",
         )
 
@@ -459,8 +462,8 @@ class MovementTeleportHook(SimpleHook):
             b"\x48\xB8" + jes_cmp_bytes +
             b"\x48\xA3" + packed_jes_cmp +
             b"\x58" # pop rax
-            b"\x57" # push rdi (original bytes)
-            b"\x48\x83\xEC\x20" # sub rsp,20 (original bytes)
+            b"\x40\x57" # push rdi (original bytes)
+            b"\x48\x83\xEC\x30" # sub rsp,30 (original bytes)
         )
         # fmt: on
 
@@ -532,12 +535,17 @@ class MovementTeleportHook(SimpleHook):
 
 
 class DropsToggleHook(SimpleHook):
-    pattern = rb"\x4C\x8B\xDC\x48\x83\xEC\x68\x48\x8B\x05...." \
-              rb"\x48\x33\xC4\x48\x89\x44\x24.\x48\x8D\x05...."
+    pattern = (
+        rb"\x48\x83\xEC\x68\x48\xC7\x44\x24\x30\xFE\xFF\xFF\xFF"
+        rb"\x48\x8B\x05....\x48\x33\xC4\x48\x89\x44\x24\x58"
+        rb"\x48\x8D\x05....\x48\x89\x44\x24\x20\x48\x89\x54\x24\x28"
+        rb"\x66\x0F\x6F\x05....\xF3\x0F\x7F\x44\x24\x48\xC6\x44\x24\x38\x00"
+        rb"\x41\xB8\x04\x00\x00\x00\x48\x8D\x15....\x48\x8D\x4C\x24\x38"
+    )
 
-    instruction_length = 7
+    instruction_length = 13
     exports = [("disable_drops_bool", 1)]
-    noops = 2
+    noops = 8
 
     async def bytecode_generator(self, packed_exports):
         return (
@@ -548,8 +556,8 @@ class DropsToggleHook(SimpleHook):
             b"\x0F\x84\x04\x00\x00\x00" # je down 4
             b"\x48\x31\xC0" # xor rax,rax
             b"\xC3" # ret
-            b"\x4C\x8B\xDC" # mov r11,rsp (original bytes)
             b"\x48\x83\xEC\x68" # sub rsp,68 (original bytes)
+            b"\x48\xC7\x44\x24\x30\xFE\xFF\xFF\xFF" # mov [rsp+30],-2 (original bytes)
         )
 
 
@@ -983,26 +991,17 @@ class ChatSendHook(SimpleHook):
     _SEND_DISAMBIG_OFFSET = 0x33
     _SEND_DISAMBIG_BYTES = b"\x48\x83\xC2\x20"
 
-    # --- Buddy add function: FUN_141710e10 ---
-    # This is the clean buddy add that takes (BuddyListManager, target_gid).
-    # The key differentiator from FUN_1412536b0 (dialog callback) is
-    # MOV [RSP+20h], RDX at func+0x1E — it saves param_2 (the GID).
-    # FUN_1412536b0 doesn't have this instruction because it only
-    # takes one parameter.
+    # Buddy-add entry: saves the target GID from RDX at rsp+20.
     _BUDDY_PATTERN = (
-        rb"\x48\x81\xEC\xA0\x00\x00\x00"       # SUB RSP, 0xA0
-        rb"\x48\x8B\x05...."                   # MOV RAX, [cookie]
-        rb"\x48\x33\xC4"                        # XOR RAX, RSP
-        rb"\x48\x89\x84\x24\x90\x00\x00\x00"  # MOV [RSP+90h], RAX
-        rb"\x48\x8B\xD9"                        # MOV RBX, RCX
-        rb"\x48\x89\x54\x24\x20"               # MOV [RSP+20h], RDX (saves param_2)
-        rb"\xBA\x10\x00\x00\x00"               # MOV EDX, 0x10
-        rb"\x48\x8D\x4C\x24\x30"               # LEA RCX, [RSP+30h]
+        rb"\x40\x53\x48\x81\xEC\xA0\x00\x00\x00"
+        rb"\x48\xC7\x44\x24\x28\xFE\xFF\xFF\xFF"
+        rb"\x48\x8B\x05....\x48\x33\xC4"
+        rb"\x48\x89\x84\x24\x90\x00\x00\x00\x48\x8B\xD9"
+        rb"\x48\x89\x54\x24\x20\xBA\x10\x00\x00\x00\x48\x8D\x4C\x24\x30"
     )
-    # MOVUPS at func+0x72 loads "MSG_BUDDYREQUESTADD". Pattern starts
-    # at func+2 (skips PUSH RBX), so disambig offset is 0x72 - 2.
-    _BUDDY_DISAMBIG_OFFSET = 0x70
-    _BUDDY_DISAMBIG_BYTES = b"\x0F\x10\x05"
+    # LEA RDX at entry+0x58 loads "MSG_BUDDYREQUESTADD".
+    _BUDDY_DISAMBIG_OFFSET = 0x58
+    _BUDDY_DISAMBIG_BYTES = b"\x48\x8D\x15"
 
     async def _resolve_send_func(self) -> int:
         """Resolve FUN_1416e5ac0 via pattern scan + disambiguation."""
@@ -1029,14 +1028,7 @@ class ChatSendHook(SimpleHook):
         )
 
     async def _resolve_buddy_add_func(self) -> int:
-        """Resolve FUN_141710e10 via pattern scan + string verification.
-
-        Multiple buddy functions (Add, Drop, etc.) share the same prologue
-        and all have MOVUPS at the same offset. We disambiguate by reading
-        the RIP-relative target of the MOVUPS and verifying it points to
-        the "MSG_BUDDYREQUESTADD" string (starts with 'M','S','G','_','B',
-        'U','D','D','Y','R','E','Q','U','E','S','T','A','D','D').
-        """
+        """Resolve the buddy-add entry and verify its message name."""
         candidates = await self.pattern_scan(
             self._BUDDY_PATTERN,
             module="WizardGraphicalClient.exe",
@@ -1053,17 +1045,16 @@ class ChatSendHook(SimpleHook):
             if probe != self._BUDDY_DISAMBIG_BYTES:
                 continue
 
-            # Read the RIP-relative offset from the MOVUPS instruction.
-            # MOVUPS XMM0,[rip+disp32] = 0F 10 05 <disp32> (7 bytes)
-            movups_addr = addr + self._BUDDY_DISAMBIG_OFFSET
-            disp32_bytes = await self.read_bytes(movups_addr + 3, 4)
+            # LEA RDX,[rip+disp32] = 48 8D 15 <disp32> (7 bytes)
+            lea_addr = addr + self._BUDDY_DISAMBIG_OFFSET
+            disp32_bytes = await self.read_bytes(lea_addr + 3, 4)
             disp32 = struct.unpack("<i", disp32_bytes)[0]
-            string_addr = (movups_addr + 7) + disp32
+            string_addr = (lea_addr + 7) + disp32
 
             # Verify it's "MSG_BUDDYREQUESTADD" (not DROP, ACCEPT, etc.)
             string_bytes = await self.read_bytes(string_addr, 19)
             if string_bytes == b"MSG_BUDDYREQUESTADD":
-                return addr - 2  # pattern starts at func+2
+                return addr  # pattern starts at the function entry
 
         from wizwalker import PatternFailed
         raise PatternFailed(
