@@ -531,6 +531,32 @@ class MovementTeleportHook(SimpleHook):
         self._set_page_protection(jes[0], self._old_je_page_protection)
 
 
+class ServerMoveSnapbackHook(SimpleHook):
+    pattern = rb"\x4C\x8B\xC1\x48\x8B\x09\x80\x79.\x00\x74.\x4C\x3B\xC2" \
+              rb"\x74.\x66\x41\x3B\x40."
+
+    instruction_length = 6
+    exports = [("server_move_snapback_bool", 1)]
+    noops = 1
+
+    async def bytecode_generator(self, packed_exports):
+        return (
+            b"\x50" # push rax
+            b"\x8B\x83\xA8\x13\x02\x00" # mov eax,[rbx+000213a8]
+            b"\x3B\x41\x28" # cmp eax,[rcx+28]
+            b"\x58" # pop rax
+            b"\x0F\x85\x17\x00\x00\x00" # jne 23
+            b"\x66\x39\x41\x20" # cmp [rcx+20],ax
+            b"\x0F\x85\x0D\x00\x00\x00" # jne 13
+            b"\x50" # push rax
+            b"\xB0\x01" # mov al,0x1
+            b"\xA2" + packed_exports[0][1] + # mov [server_move_snapback_bool],al
+            b"\x58" # pop rax
+            b"\x4C\x8B\xC1" # mov r8,rcx (original bytes)
+            b"\x48\x8B\x09" # mov rcx,[rcx] (original bytes)
+        )
+
+
 class DropsToggleHook(SimpleHook):
     pattern = rb"\x48\x83\xEC\x68\x48\xC7\x44\x24\x30\xFE\xFF\xFF\xFF" \
               rb"\x48\x8B\x05....\x48\x33\xC4\x48\x89\x44\x24." \
