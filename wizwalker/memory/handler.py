@@ -23,6 +23,7 @@ from .hooks import (
     DropsToggleHook,
     DanceGameMovesHook,
     AhmarraAutoPuzzleHook,
+    UpdateZoneCounterHook,
     MemoryHook
 )
 from .memory_reader import MemoryReader, Primitive
@@ -35,14 +36,13 @@ class HookHandler(MemoryReader):
     """
 
     AUTOBOT_PATTERN = (
-        rb"\x48\x89\x5C\x24.\x48\x89\x74\x24.\x48\x89\x7C\x24."
-        rb"\x55\x41\x54\x41\x55\x41\x56\x41\x57"
-        rb"\x48\x8D\xAC\x24....\x48\x81\xEC...."
-        rb"\x48\x8B\x05....\x48\x33\xC4\x48\x89\x85...."
-        rb"\x4C\x8B\xF1.......\x80......\x0F\x84...."
+        rb"\x48\x8B\xC4\x55\x41\x54\x41\x55\x41\x56\x41\x57......."
+        rb"\x48......\x48.......\x48\x89\x58\x10\x48\x89"
+        rb"\x70\x18\x48\x89\x78\x20.......\x48\x33\xC4....."
+        rb"..\x4C\x8B\xE9.......\x80......\x0F"
     )
     # rounded down
-    AUTOBOT_SIZE = 4100
+    AUTOBOT_SIZE = 3900
 
     def __init__(self, process: pymem.Pymem, client):
         super().__init__(process)
@@ -199,6 +199,7 @@ class HookHandler(MemoryReader):
         await self.activate_movement_teleport_hook(wait_for_ready=False)
         await self.activate_drops_toggle_hook(wait_for_ready=False)
         await self.activate_auto_puzzle_hook(wait_for_ready=False)
+        await self.activate_update_zone_counter_hook(wait_for_ready=False)
 
         if wait_for_ready:
             wait_tasks = []
@@ -609,6 +610,39 @@ class HookHandler(MemoryReader):
 
         if addr is None:
             raise HookNotActive("Auto puzzle")
+
+        return addr
+
+    async def activate_update_zone_counter_hook(
+        self, *, wait_for_ready: bool = False, timeout: float = None
+    ):
+
+        if self._check_if_hook_active(UpdateZoneCounterHook):
+            raise HookAlreadyActivated("Update Zone Counter")
+
+        await self._check_for_autobot()
+
+        update_zone_counter_hook = UpdateZoneCounterHook(self)
+        await update_zone_counter_hook.hook()
+
+        self._active_hooks[UpdateZoneCounterHook] = update_zone_counter_hook
+        self._base_addrs["server_teleport_snapback_bool"] = update_zone_counter_hook.server_teleport_snapback_bool
+    
+    async def deactivate_update_zone_counter_hook(self):
+
+        if not self._check_if_hook_active(UpdateZoneCounterHook):
+            raise HookNotActive("Update Zone Counter")
+
+        update_zone_counter_hook = self._active_hooks.pop(UpdateZoneCounterHook)
+        await update_zone_counter_hook.unhook()
+
+        del self._base_addrs["server_teleport_snapback_bool"]
+
+    async def read_server_teleport_snapback_bool(self) -> int:
+        addr = self._base_addrs.get("server_teleport_snapback_bool")
+
+        if addr is None:
+            raise HookNotActive("Update Zone Counter")
 
         return addr
 

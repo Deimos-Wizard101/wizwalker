@@ -32,6 +32,7 @@ from .memory import (
     MovementTeleportHook,
     DropsToggleHook,
     AhmarraAutoPuzzleHook,
+    UpdateZoneCounterHook,
 )
 from .memory.memory_objects.character_registry import DynamicCharacterRegistry
 from .memory.memory_objects.quest_client_manager import QuestClientManager
@@ -84,6 +85,7 @@ class Client:
 
         self._disable_drops_bool = None
         self._auto_puzzle_bool = None
+        self._server_teleport_snapback_bool = None
         self._template_ids = None
         self._world_view_window = None
         self._character_registry_addr = None
@@ -626,6 +628,27 @@ class Client:
 
         await self.hook_handler.write_bytes(
             self._auto_puzzle_bool,
+            b"\x00"
+        )
+    
+    async def is_server_teleport_snapbacked(self):
+        if not self.hook_handler._check_if_hook_active(UpdateZoneCounterHook):
+            raise RuntimeError("Update zone counter not active")
+        
+        if not self._server_teleport_snapback_bool:
+            self._server_teleport_snapback_bool = await self.hook_handler.read_server_teleport_snapback_bool()
+        
+        return await self.hook_handler.read_typed(self._server_teleport_snapback_bool, Primitive.bool)
+    
+    async def reset_server_teleport_snapback(self):
+        if not self.hook_handler._check_if_hook_active(UpdateZoneCounterHook):
+            raise RuntimeError("Update zone counter not active")
+        
+        if not self._server_teleport_snapback_bool:
+            self._server_teleport_snapback_bool = await self.hook_handler.read_server_teleport_snapback_bool()
+        
+        await self.hook_handler.write_bytes(
+            self._server_teleport_snapback_bool,
             b"\x00"
         )
 
