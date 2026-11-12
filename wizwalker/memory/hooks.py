@@ -307,10 +307,10 @@ class RootWindowHook(SimpleHook):
         # fmt: off
         bytecode = (
             b"\x50"  # push rax
-            b"\x49\x8B\x85\xD8\x00\x00\x00"  # mov rax,[r13+D8]
+            b"\x49\x8B\x87\xD8\x00\x00\x00"  # mov rax,[r15+D8]
             b"\x48\xA3" + packed_exports[0][1] +  # mov [current_root_window_addr], rax
             b"\x58"  # pop rax
-            b"\x49\x8B\x8D\xD8\x00\x00\x00"  # original instruction
+            b"\x49\x8B\x8F\xD8\x00\x00\x00"  # original instruction
         )
         # fmt: on
 
@@ -338,14 +338,14 @@ class RenderContextHook(SimpleHook):
 
 
 class MovementTeleportHook(SimpleHook):
-    pattern = rb"\x57\x48\x83\xEC.\x48\x8B\x99...." \
-              rb"\x48\x85\xDB\x74.\x4C\x8B\x43.\x48\x8B\x5B"\
-              rb".\x48\x85\xDB\x74.\xF0\xFF\x43.\x4D\x85" \
-              rb"\xC0\x74.\xF2\x0F\x10\x02\xF2\x41\x0F\x11\x40" \
-              rb".\x8B\x42.\x41\x89\x40.\x41\xC6\x80."
+    pattern = rb"\x40\x57\x48\x83\xEC\x30\x48\xC7\x44\x24\x20\xFE" \
+              rb"\xFF\xFF\xFF\x48\x89\x5C\x24\x40\x48\x8B\x99\xB8" \
+              rb"\x01\x00\x00\x48\x85\xDB\x74\x13\x4C\x8B\x43\x70" \
+              rb"\x48\x8B\x5B\x78\x48\x85\xDB\x74\x0C\xF0\xFF\x43" \
+              rb"\x08\xEB\x06\x45\x33\xC0\x41\x8B\xD8\x4D\x85\xC0\x74\x19"
 
-    instruction_length = 5
-    noops = 0
+    instruction_length = 6
+    noops = 1
     # position vector = 12 + 1 for update bool + 8 for target object address
     exports = [("teleport_helper", 21)]
 
@@ -390,12 +390,12 @@ class MovementTeleportHook(SimpleHook):
         target_address = jes[0]
 
         inside_event_je_addr = await self.pattern_scan(
-            rb"\x74.\xF3\x0F\x10\x55\xA8",
+            rb"\x74.\xF3\x0F\x10\x55\x90",
             module="WizardGraphicalClient.exe",
         )
         
         event_dispatch_je_addr = await self.pattern_scan(
-            rb"\x74.\xF3\x0F\x10\x44\x24\x54\xF3\x0F",
+            rb"\x74.\xF3\x0F\x10\x44\x24\x58\xF3\x0F",
             module="WizardGraphicalClient.exe",
         )
 
@@ -459,8 +459,8 @@ class MovementTeleportHook(SimpleHook):
             b"\x48\xB8" + jes_cmp_bytes +
             b"\x48\xA3" + packed_jes_cmp +
             b"\x58" # pop rax
-            b"\x57" # push rdi (original bytes)
-            b"\x48\x83\xEC\x20" # sub rsp,20 (original bytes)
+            b"\x40\x57" # push rdi (original bytes)
+            b"\x48\x83\xEC\x30" # sub rsp,30 (original bytes)
         )
         # fmt: on
 
@@ -532,12 +532,15 @@ class MovementTeleportHook(SimpleHook):
 
 
 class DropsToggleHook(SimpleHook):
-    pattern = rb"\x4C\x8B\xDC\x48\x83\xEC\x68\x48\x8B\x05...." \
-              rb"\x48\x33\xC4\x48\x89\x44\x24.\x48\x8D\x05...."
+    pattern = rb"\x48\x83\xEC\x68\x48\xC7\x44\x24\x30\xFE\xFF\xFF\xFF" \
+              rb"\x48\x8B\x05....\x48\x33\xC4\x48\x89\x44\x24." \
+              rb"\x48\x8D\x05....\x48\x89\x44\x24.\x48\x89\x54\x24." \
+              rb"\x66\x0F\x6F\x05....\xF3\x0F\x7F\x44\x24.\xC6\x44\x24.." \
+              rb"\x41\xB8\x04\x00\x00\x00"
 
-    instruction_length = 7
+    instruction_length = 13
     exports = [("disable_drops_bool", 1)]
-    noops = 2
+    noops = 8
 
     async def bytecode_generator(self, packed_exports):
         return (
@@ -548,8 +551,8 @@ class DropsToggleHook(SimpleHook):
             b"\x0F\x84\x04\x00\x00\x00" # je down 4
             b"\x48\x31\xC0" # xor rax,rax
             b"\xC3" # ret
-            b"\x4C\x8B\xDC" # mov r11,rsp (original bytes)
             b"\x48\x83\xEC\x68" # sub rsp,68 (original bytes)
+            b"\x48\xC7\x44\x24\x30\xFE\xFF\xFF\xFF" # mov qword ptr [rsp+30],FFFFFFFFFFFFFFFE (original bytes)
         )
 
 
@@ -689,17 +692,17 @@ class User32GetClassInfoBaseHook(AutoBotBaseHook):
 
 # Thanks to peechez for this class
 class DanceGameMovesHook(SimpleHook):
-    pattern = rb"\x48\x8B\xD8\x48\x39\x70\x10\x76.\x8B\xC6"
+    pattern = rb"\x48\x8B\xF8\x48\x39\x70\x10"
     instruction_length = 7
     exports = [("dance_game_moves", 8)]
     noops = 2
 
     async def bytecode_generator(self, packed_exports):
         return (
-                b"\x48\x8B\xD8"
+                b"\x48\x8B\xF8"
                 b"\x48\x8B\x00"
                 b"\x48\xA3" + packed_exports[0][1] +
-                b"\x48\x8B\xC3"
+                b"\x48\x8B\xC7"
                 b"\x48\x39\x70\x10"
         )
 
