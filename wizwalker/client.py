@@ -560,7 +560,7 @@ class Client:
 
         teleport_distance = (1.4 * self._teleport_distance) if player_is_mounted else self._teleport_distance
 
-        if distance_from_final <= teleport_distance:
+        if teleport_distance == 0 or distance_from_final <= teleport_distance:
             await self._teleport_object(
                 client_object_addr,
                 xyz,
