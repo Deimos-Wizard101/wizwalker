@@ -267,7 +267,7 @@ class QuestHook(SimpleHook):
 
 class ClientHook(SimpleHook):
     pattern = (
-        rb"\x18\x48......\x48\x8B\x7C\x24\x38\x48\x85\xFF\x74\x29\x8B\xC6\xF0\x0F\xC1\x47\x08\x83\xF8\x01\x75\x1D"
+        rb"\x18\x48\x8B\x9B\xC0\x01\x00\x00\x48\x8B\x7C\x24.\x48\x85\xFF\x74\x29\x8B\xC6\xF0\x0F\xC1\x47\x08\x83\xF8\x01\x75\x1D"
         rb"\x48\x8B\x07\x48\x8B\xCF\xFF\x50\x08\xF0\x0F\xC1\x77\x0C"
     )
     exports = [("current_client_addr", 8)]
@@ -553,6 +553,64 @@ class DropsToggleHook(SimpleHook):
         )
 
 
+class AhmarraAutoPuzzleHook(SimpleHook):
+    pattern = rb"\xE8....\x8B\xD3\x48\x8B\xC8\xE8....\x45\x33\xC0\x48\x8D\x55." \
+              rb"\x48\x8B\x0D....\xE8....\x90\x48\x8D\x4D." \
+              rb"\xE8....\x90\x48\x8D\x05....\x48\x89\x45."
+
+    instruction_length = 5
+    exports = [("auto_puzzle_bool", 1)]
+    noops = 0
+
+    async def bytecode_generator(self, packed_exports):
+        return (
+            b"\x50" # push rax
+            b"\xA0" + packed_exports[0][1] + # mov al,[auto_puzzle_bool]
+            b"\x84\xC0" # test al,al
+            b"\x58" # pop rax
+            b"\x0F\x84\x0A\x00\x00\x00" # je down 10
+            b"\xBA\x01\x00\x00\x00" # mov edx,1
+            b"\xE9\x02\x00\x00\x00" # jmp down 2
+            b"\x8B\xD3" # mov edx,ebx (original bytes)
+            b"\x48\x8B\xC8" # mov rcx,rax (original bytes)
+        )
+
+    async def hook(self):
+        """
+        Writes jump_bytecode to jump address and hook bytecode to hook address
+        """
+        pattern, module = await self.get_pattern()
+
+        offset = 5
+
+        self.jump_address = await self.get_jump_address(pattern, module=module) + offset
+        self.hook_address = await self.get_hook_address(50)
+
+        logger.debug(f"Got hook address {self.hook_address} in {type(self)}")
+        logger.debug(f"Got jump address {self.jump_address} in {type(self)}")
+
+        self.hook_bytecode = await self.get_hook_bytecode()
+        self.jump_bytecode = await self.get_jump_bytecode()
+
+        logger.debug(f"Got hook bytecode {self.hook_bytecode} in {type(self)}")
+        logger.debug(f"Got jump bytecode {self.jump_bytecode} in {type(self)}")
+
+        self.jump_original_bytecode = await self.read_bytes(
+            self.jump_address, len(self.jump_bytecode)
+        )
+
+        logger.debug(
+            f"Got jump original bytecode {self.jump_original_bytecode} in {type(self)}"
+        )
+
+        await self.prehook()
+
+        await self.write_bytes(self.hook_address, self.hook_bytecode)
+        await self.write_bytes(self.jump_address, self.jump_bytecode)
+
+        await self.posthook()
+
+
 # TODO: fix this hacky class
 class User32GetClassInfoBaseHook(AutoBotBaseHook):
     """
@@ -608,6 +666,23 @@ class User32GetClassInfoBaseHook(AutoBotBaseHook):
         if self._hooked_instances == 0:
             await self.write_bytes(self._autobot_addr, self._autobot_original_bytes)
             self._autobot_bytes_offset = 0
+
+
+# Thanks to peechez for this class
+class DanceGameMovesHook(SimpleHook):
+    pattern = rb"\x48\x8B\xD8\x48\x39\x70\x10\x76.\x8B\xC6"
+    instruction_length = 7
+    exports = [("dance_game_moves", 8)]
+    noops = 2
+
+    async def bytecode_generator(self, packed_exports):
+        return (
+                b"\x48\x8B\xD8"
+                b"\x48\x8B\x00"
+                b"\x48\xA3" + packed_exports[0][1] +
+                b"\x48\x8B\xC3"
+                b"\x48\x39\x70\x10"
+        )
 
 
 class MouselessCursorMoveHook(User32GetClassInfoBaseHook):
