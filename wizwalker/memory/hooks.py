@@ -611,6 +611,25 @@ class AhmarraAutoPuzzleHook(SimpleHook):
         await self.posthook()
 
 
+class UpdateZoneCounterHook(SimpleHook):
+    pattern = rb"\x48\x83\xEC\x20\x48\x8B\xC2\x48\x8B\xD9\x48\x8B\xC8\x48\x8D\x15...." \
+              rb"\xE8....\x48\x8B\xC8\xE8....\x88\x83....\x33\xC0\x48\x83\xC4.\x5B\xC3"
+    
+    instruction_length = 7
+    exports = [("server_teleport_snapback_bool", 1)]
+    noops = 2
+    
+    async def bytecode_generator(self, packed_exports):
+        return (
+            b"\x50" # push rax
+            b"\xB8\x01\x00\x00\x00" # mov eax,0x1
+            b"\xA3" + packed_exports[0][1] + # mov [packed_server_teleport_snapback_bool],eax
+            b"\x58" # pop rax
+            b"\x48\x83\xEC\x20" # sub rsp,20 (original bytes)
+            b"\x48\x8B\xC2" # mov rax,rdx (original bytes)
+        )
+
+
 # TODO: fix this hacky class
 class User32GetClassInfoBaseHook(AutoBotBaseHook):
     """
