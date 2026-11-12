@@ -264,15 +264,22 @@ def get_wiz_install() -> Path:
         raise Exception("Wizard101 install not found.")
 
 
-def start_instance():
+def start_instance(is_steam: bool = False):
     """
     Starts a wizard101 instance
     """
     location = get_wiz_install()
-    subprocess.Popen(
-        rf"{location}\Bin\WizardGraphicalClient.exe -L login.us.wizard101.com 12000",
-        cwd=rf"{location}\Bin",
-    )
+    if is_steam:
+        subprocess.Popen(
+            rf"{location}\Bin\WizardGraphicalClient.exe -L login.us.wizard101.com 12000 -ST",
+            cwd=rf"{location}\Bin",
+        )
+        
+    else:
+        subprocess.Popen(
+            rf"{location}\Bin\WizardGraphicalClient.exe -L login.us.wizard101.com 12000",
+            cwd=rf"{location}\Bin",
+        )
 
 
 def instance_login(window_handle: int, username: str, password: str):
@@ -307,7 +314,7 @@ def instance_login(window_handle: int, username: str, password: str):
 # --- [cancelButton] ControlButton
 # --- [title1] ControlText
 # --- [loginName] ControlEdit
-async def start_instances_with_login(instance_number: int, logins: Iterable, wait_for_ready=True):
+async def start_instances_with_login(instance_number: int, logins: Iterable, wait_for_ready=True, is_steam: bool = True):
     """
     Start a number of instances and login to them with logins
 
@@ -318,7 +325,7 @@ async def start_instances_with_login(instance_number: int, logins: Iterable, wai
     start_handles = set(get_all_wizard_handles())
 
     for _ in range(instance_number):
-        start_instance()
+        start_instance(is_steam=is_steam)
 
     # TODO: have way to properly check if instances are on login screen
     # waiting for instances to start
