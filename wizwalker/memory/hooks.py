@@ -556,6 +556,39 @@ class ServerMoveSnapbackHook(SimpleHook):
             b"\x48\x8B\x09" # mov rcx,[rcx] (original bytes)
         )
 
+    async def hook(self):
+        """
+        Writes jump_bytecode to jump address and hook bytecode to hook address
+        """
+        pattern, module = await self.get_pattern()
+
+        self.jump_address = await self.get_jump_address(pattern, module=module)
+        self.hook_address = await self.get_hook_address(75)
+
+        logger.debug(f"Got hook address {self.hook_address} in {type(self)}")
+        logger.debug(f"Got jump address {self.jump_address} in {type(self)}")
+
+        self.hook_bytecode = await self.get_hook_bytecode()
+        self.jump_bytecode = await self.get_jump_bytecode()
+
+        logger.debug(f"Got hook bytecode {self.hook_bytecode} in {type(self)}")
+        logger.debug(f"Got jump bytecode {self.jump_bytecode} in {type(self)}")
+
+        self.jump_original_bytecode = await self.read_bytes(
+            self.jump_address, len(self.jump_bytecode)
+        )
+
+        logger.debug(
+            f"Got jump original bytecode {self.jump_original_bytecode} in {type(self)}"
+        )
+
+        await self.prehook()
+
+        await self.write_bytes(self.hook_address, self.hook_bytecode)
+        await self.write_bytes(self.jump_address, self.jump_bytecode)
+
+        await self.posthook()
+
 
 class DropsToggleHook(SimpleHook):
     pattern = rb"\x48\x83\xEC\x68\x48\xC7\x44\x24\x30\xFE\xFF\xFF\xFF" \
