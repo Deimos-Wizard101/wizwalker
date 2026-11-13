@@ -728,27 +728,29 @@ class Client:
             self._auto_puzzle_bool,
             b"\x00"
         )
-    
+
     async def is_server_teleport_snapbacked(self):
         if not self.hook_handler._check_if_hook_active(UpdateZoneCounterHook):
             raise RuntimeError("Update zone counter not active")
-        
+
         if not self._server_teleport_snapback_bool:
             self._server_teleport_snapback_bool = await self.hook_handler.read_server_teleport_snapback_bool()
 
-        return await self.hook_handler.read_typed(self._server_teleport_snapback_bool, Primitive.bool)
-    
+        value = await self.hook_handler.read_typed(self._server_teleport_snapback_bool, Primitive.bool)
+
+        if value:
+            await self.reset_server_teleport_snapback()
+
+        return value
+
     async def reset_server_teleport_snapback(self):
         if not self.hook_handler._check_if_hook_active(UpdateZoneCounterHook):
             raise RuntimeError("Update zone counter not active")
-        
+
         if not self._server_teleport_snapback_bool:
             self._server_teleport_snapback_bool = await self.hook_handler.read_server_teleport_snapback_bool()
-        
-        await self.hook_handler.write_bytes(
-            self._server_teleport_snapback_bool,
-            b"\x00"
-        )
+
+        await self.hook_handler.write_typed(self._server_teleport_snapback_bool, False, Primitive.bool)
 
     async def is_server_move_snapbacked(self) -> bool:
         if not self.hook_handler._check_if_hook_active(ServerMoveSnapbackHook):
