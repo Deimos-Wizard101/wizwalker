@@ -18,6 +18,7 @@ from .duel import CurrentDuel, Duel, DynamicDuel
 from .enums import *
 from .game_stats import CurrentGameStats
 from .quest_position import CurrentQuestPosition
+from .calescent_tracker_position import CurrentCalescentTrackerPosition
 from .spell_effect import SpellEffects, DynamicSpellEffect
 from .spell_template import SpellTemplate, DynamicSpellTemplate
 from .spell import DynamicHand, DynamicSpell, Hand, Spell
