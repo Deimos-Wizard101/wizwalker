@@ -1,3 +1,4 @@
+import sys
 import asyncio
 import ctypes
 import ctypes.wintypes
@@ -118,7 +119,7 @@ class MemoryHook(MemoryReader):
         await self.prehook()
 
         await self.write_bytes(self.hook_address, self.hook_bytecode)
-        await self.write_bytes(self.jump_address, self.jump_bytecode)
+        await self.write_code(self.jump_address, self.jump_bytecode)
 
         await self.posthook()
 
@@ -130,7 +131,7 @@ class MemoryHook(MemoryReader):
         logger.debug(
             f"Writing original bytecode {self.jump_original_bytecode} to {self.jump_address}"
         )
-        await self.write_bytes(self.jump_address, self.jump_original_bytecode)
+        await self.write_code(self.jump_address, self.jump_original_bytecode)
         for addr in self._allocated_addresses:
             await self.free(addr)
 
@@ -141,6 +142,12 @@ class AutoBotBaseHook(MemoryHook):
     """
 
     async def alloc(self, size: int) -> int:
+        if sys.platform == "darwin":
+            # No autobot on macOS. Give each hook its own fresh RWX page placed
+            # within rel32 of its site so the 5-byte E9 jump reaches. Left leaked on
+            # unhook on purpose: Rosetta caches translations by address, so freeing
+            # and reusing an executed cave page would run a stale translation.
+            return await self.allocate_near(size, self.jump_address)
         # noinspection PyProtectedMember
         return await self.hook_handler._allocate_autobot_bytes(size)
 
@@ -149,7 +156,7 @@ class AutoBotBaseHook(MemoryHook):
         logger.debug(
             f"Writing original bytecode {self.jump_original_bytecode} to {self.jump_address}"
         )
-        await self.write_bytes(self.jump_address, self.jump_original_bytecode)
+        await self.write_code(self.jump_address, self.jump_original_bytecode)
 
 
 class SimpleHook(AutoBotBaseHook):
@@ -451,7 +458,7 @@ class MovementTeleportHook(SimpleHook):
         self._old_collision_jes_bytes = (old_inside_event_je_bytes, old_event_dispatch_je_addr)
 
         for addr in self._collision_je_addrs:
-            await self.write_bytes(addr, b"\x90\x90")
+            await self.write_code(addr, b"\x90\x90")
 
         # 0x40 is read, write, execute
         self._old_je_page_protection = self._set_page_protection(target_address, 0x40)
@@ -476,6 +483,25 @@ class MovementTeleportHook(SimpleHook):
         packed_jes_and = struct.pack("<Q", jes[0])
         packed_jes_cmp = struct.pack("<Q", jes[1])
 
+        # Restoring the NOPed je's is done by the game writing back their original
+        # bytes from here (self-modifying code). That needs the je's .text page to
+        # be writable by the target itself. On Windows prehook raises it to RWX via
+        # VirtualProtectEx; on Linux page protection cannot be changed in another
+        # process, so the target's write to its own r-x code faults and crashes the
+        # client. Replace the four restore instructions with NOPs of identical
+        # length (so every relative offset in this block is unchanged) and let the
+        # Python teleport path restore the je's instead (its /proc write to r-x is
+        # fine). See Client._teleport_object.
+        if sys.platform == "win32":
+            je_restore = (
+                b"\x48\xB8" + jes_and_bytes +   # mov rax, <orig je[0] bytes>
+                b"\x48\xA3" + packed_jes_and +  # mov [je[0]], rax
+                b"\x48\xB8" + jes_cmp_bytes +   # mov rax, <orig je[1] bytes>
+                b"\x48\xA3" + packed_jes_cmp    # mov [je[1]], rax
+            )
+        else:
+            je_restore = b"\x90" * 40
+
         # fmt: off
         bytecode = (
             b"\x50"  # push rax
@@ -499,10 +525,7 @@ class MovementTeleportHook(SimpleHook):
             b"\x89\x42\x08"  # mov[rdx+08], eax
             b"\x48\xB8\x00\x00\x00\x00\x00\x00\x00\x00"  # mov rax,0000000000000000
             b"\xA2" + packed_should_update +  # mov [should_update_bool],al
-            b"\x48\xB8" + jes_and_bytes +
-            b"\x48\xA3" + packed_jes_and +
-            b"\x48\xB8" + jes_cmp_bytes +
-            b"\x48\xA3" + packed_jes_cmp +
+            je_restore +  # restore je's (Win) / NOPs on Linux, same length
             b"\x58" # pop rax
             b"\x40\x57" # push rdi (original bytes)
             b"\x48\x83\xEC\x30" # sub rsp,30 (original bytes)
@@ -540,7 +563,7 @@ class MovementTeleportHook(SimpleHook):
         await self.prehook()
 
         await self.write_bytes(self.hook_address, self.hook_bytecode)
-        await self.write_bytes(self.jump_address, self.jump_bytecode)
+        await self.write_code(self.jump_address, self.jump_bytecode)
 
         await self.posthook()
 
@@ -568,10 +591,10 @@ class MovementTeleportHook(SimpleHook):
         jes = await self.hook_handler.client._get_je_instruction_forward_backwards()
 
         for je, je_bytes in zip(jes, self._old_jes_bytes):
-            await self.hook_handler.write_bytes(je, je_bytes)
+            await self.hook_handler.write_code(je, je_bytes)
 
         for addr, old_bytes in zip(self._collision_je_addrs, self._old_collision_jes_bytes):
-            await self.write_bytes(addr, old_bytes)
+            await self.write_code(addr, old_bytes)
 
         self._set_page_protection(jes[0], self._old_je_page_protection)
 
@@ -630,7 +653,7 @@ class ServerMoveSnapbackHook(SimpleHook):
         await self.prehook()
 
         await self.write_bytes(self.hook_address, self.hook_bytecode)
-        await self.write_bytes(self.jump_address, self.jump_bytecode)
+        await self.write_code(self.jump_address, self.jump_bytecode)
 
         await self.posthook()
 
@@ -713,7 +736,7 @@ class AhmarraAutoPuzzleHook(SimpleHook):
         await self.prehook()
 
         await self.write_bytes(self.hook_address, self.hook_bytecode)
-        await self.write_bytes(self.jump_address, self.jump_bytecode)
+        await self.write_code(self.jump_address, self.jump_bytecode)
 
         await self.posthook()
 
@@ -787,7 +810,7 @@ class User32GetClassInfoBaseHook(AutoBotBaseHook):
 
     async def unhook(self):
         self._hooked_instances -= 1
-        await self.write_bytes(self.jump_address, self.jump_original_bytecode)
+        await self.write_code(self.jump_address, self.jump_original_bytecode)
 
         if self._hooked_instances == 0:
             await self.write_bytes(self._autobot_addr, self._autobot_original_bytes)
@@ -848,7 +871,7 @@ class MouselessCursorMoveHook(User32GetClassInfoBaseHook):
         await self.prehook()
 
         await self.write_bytes(self.hook_address, self.hook_bytecode)
-        await self.write_bytes(self.jump_address, self.jump_bytecode)
+        await self.write_code(self.jump_address, self.jump_bytecode)
 
         await self.posthook()
 
@@ -1043,7 +1066,7 @@ class ChatHook(SimpleHook):
 
         await self.prehook()
         await self.write_bytes(self.hook_address, self.hook_bytecode)
-        await self.write_bytes(self.jump_address, self.jump_bytecode)
+        await self.write_code(self.jump_address, self.jump_bytecode)
         await self.posthook()
 
     async def bytecode_generator(self, packed_exports):
@@ -1291,7 +1314,7 @@ class ChatSendHook(SimpleHook):
 
         await self.prehook()
         await self.write_bytes(self.hook_address, self.hook_bytecode)
-        await self.write_bytes(self.jump_address, self.jump_bytecode)
+        await self.write_code(self.jump_address, self.jump_bytecode)
         await self.posthook()
 
     def _build_action_block(self, trigger_addr, save_restore, call_setup, clear_trigger):

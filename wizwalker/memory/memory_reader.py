@@ -2,6 +2,7 @@ import asyncio
 import functools
 import regex
 import struct
+import sys
 from typing import Any, Union
 
 import pefile
@@ -20,6 +21,12 @@ from wizwalker import (
     Primitive,
     utils,
 )
+
+
+# Cached module reads for pattern scanning, keyed by (pid, module_name, base). A
+# loaded image's bytes don't move, so scanning many patterns (e.g. installing all
+# hooks) reads each module once instead of per pattern.
+_MODULE_SCAN_CACHE = {}
 
 
 class MemoryReader:
@@ -135,6 +142,51 @@ class MemoryReader:
 
         return found
 
+    @staticmethod
+    def _read_module_regions(handle, module):
+        """Read a module's committed, readable regions once as (base, bytes) pairs.
+
+        Pattern scanning a module otherwise re-reads the whole image (tens of MB,
+        region by region) for every pattern — the dominant cost when installing many
+        hooks. The image's code/data don't move, so the read is cached per
+        (pid, module) and every scan runs against the cached bytes.
+        """
+        base = module.lpBaseOfDll
+        max_address = base + module.SizeOfImage
+        allowed_protections = [
+            pymem.ressources.structure.MEMORY_PROTECTION.PAGE_EXECUTE_READ,
+            pymem.ressources.structure.MEMORY_PROTECTION.PAGE_EXECUTE_READWRITE,
+            pymem.ressources.structure.MEMORY_PROTECTION.PAGE_READWRITE,
+            pymem.ressources.structure.MEMORY_PROTECTION.PAGE_READONLY,
+        ]
+        regions = []
+        addr = base
+        while addr < max_address:
+            mbi = pymem.memory.virtual_query(handle, addr)
+            next_region = mbi.BaseAddress + mbi.RegionSize
+            if next_region <= addr:  # no forward progress — stop
+                break
+            if (
+                mbi.state == pymem.ressources.structure.MEMORY_STATE.MEM_COMMIT
+                and mbi.protect in allowed_protections
+            ):
+                size = min(mbi.RegionSize, max_address - mbi.BaseAddress)
+                regions.append(
+                    (mbi.BaseAddress, pymem.memory.read_bytes(handle, mbi.BaseAddress, size))
+                )
+            addr = next_region
+        return regions
+
+    @staticmethod
+    def _scan_cached_regions(regions, pattern, return_multiple):
+        # Collect every match (not just the first) so the caller can still detect
+        # PatternMultipleResults — matching the live _scan_entire_module semantics.
+        found = []
+        for region_base, region_bytes in regions:
+            for match in regex.finditer(pattern, region_bytes, regex.DOTALL):
+                found.append(region_base + match.span()[0])
+        return found
+
     async def pattern_scan(
         self, pattern: bytes, *, module: str = None, return_multiple: bool = False
     ) -> Union[list, int]:
@@ -159,13 +211,22 @@ class MemoryReader:
             if module_object is None:
                 raise ValueError(f"{module} module not found.")
 
-            # this can take a long time to run when collecting multiple results
-            # so must be run in an executor
+            # Read the module once and scan the cached bytes: a module's code/data
+            # don't move, and re-reading the whole image per pattern is the dominant
+            # cost when installing many hooks (e.g. activate_hooks). Cached per
+            # (pid, module, base).
+            key = (self.process.process_id, module, module_object.lpBaseOfDll)
+            regions = _MODULE_SCAN_CACHE.get(key)
+            if regions is None:
+                regions = await self.run_in_executor(
+                    self._read_module_regions,
+                    self.process.process_handle,
+                    module_object,
+                )
+                _MODULE_SCAN_CACHE[key] = regions
+
             found_addresses = await self.run_in_executor(
-                self._scan_entire_module,
-                self.process.process_handle,
-                module_object,
-                pattern,
+                self._scan_cached_regions, regions, pattern, return_multiple
             )
 
         else:
@@ -208,13 +269,26 @@ class MemoryReader:
         Raises:
             ValueError: No symbol/module with that name
         """
-        if not module_dir:
-            module_dir = utils.get_system_directory()
-
-        file_path = module_dir / module_name
-
-        if not file_path.exists():
+        module = pymem.process.module_from_name(
+            self.process.process_handle, module_name
+        )
+        if module is None:
             raise ValueError(f"No module named {module_name}")
+
+        if sys.platform != "win32" and module_dir is None:
+            # On Linux the DLL is a Wine PE loaded from the Proton tree, not a
+            # Windows system dir (get_system_directory is a stub here). Resolve
+            # symbols from the exact file backing the loaded mapping so the
+            # export RVAs match what is actually in memory.
+            file_path = self._backing_file_for(module.lpBaseOfDll)
+            if file_path is None:
+                raise ValueError(f"No backing file for module {module_name}")
+        else:
+            if not module_dir:
+                module_dir = utils.get_system_directory()
+            file_path = module_dir / module_name
+            if not file_path.exists():
+                raise ValueError(f"No module named {module_name}")
 
         symbols = await self.run_in_executor(
             self._get_symbols, file_path, force_reload=force_reload
@@ -223,11 +297,26 @@ class MemoryReader:
         if not (symbol := symbols.get(symbol_name)):
             raise ValueError(f"No symbol named {symbol_name} in module {module_name}")
 
-        module = pymem.process.module_from_name(
-            self.process.process_handle, module_name
-        )
-
         return module.lpBaseOfDll + symbol
+
+    def _backing_file_for(self, address: int):
+        """The on-disk file backing the mapping containing `address` in the
+        target, from /proc/<pid>/maps — lets Linux resolve a Wine DLL's symbols
+        from the exact PE image the process loaded."""
+        pid = self.process.process_id
+        try:
+            with open(f"/proc/{pid}/maps") as f:
+                for line in f:
+                    parts = line.split(maxsplit=5)
+                    if len(parts) < 6:
+                        continue
+                    lo, _, hi = parts[0].partition("-")
+                    if int(lo, 16) <= address < int(hi, 16):
+                        path = parts[5].strip()
+                        return path if path.startswith("/") else None
+        except OSError:
+            pass
+        return None
 
     async def allocate(self, size: int) -> int:
         """
@@ -304,6 +393,41 @@ class MemoryReader:
                 raise ClientClosedError()
             else:
                 raise MemoryWriteError(address)
+
+    async def write_code(self, address: int, value: bytes):
+        """
+        Write bytes into EXECUTABLE memory so the patch takes effect.
+
+        On macOS an inline patch must be applied as a guest W^X write — Rosetta
+        ignores an external write to already-translated code, so a plain write_bytes
+        to a hook site never fires. zhol.write_code performs the
+        VirtualProtect(RW) -> write -> VirtualProtect(RX) -> FlushInstructionCache
+        sequence as guest code via the one-shot RPC. On Windows/Linux this is an
+        ordinary memory write.
+        """
+        if sys.platform != "darwin":
+            await self.write_bytes(address, value)
+            return
+        # If a batch is open on the owning hook handler, defer this write into it so
+        # a whole burst of installs flushes in one RPC (see HookHandler flush).
+        owner = getattr(self, "hook_handler", self)
+        batch = getattr(owner, "_code_write_batch", None)
+        if batch is not None:
+            batch.append((address, bytes(value)))
+            return
+        await self.run_in_executor(
+            self.process.process_handle.write_code, address, value
+        )
+
+    async def allocate_near(self, size: int, near: int) -> int:
+        """
+        Allocate executable memory reachable by a 5-byte E9 rel32 jump from ``near``
+        (a hook's patch site). On macOS the cave is placed within ±2 GiB of ``near``
+        so the jump reaches; elsewhere ``near`` is advisory.
+        """
+        if sys.platform == "darwin":
+            return self.process.process_handle.allocate_near(size, near)
+        return await self.allocate(size)
 
     async def read_typed(self, address: int, data_type: Primitive) -> Any:
         """
