@@ -89,7 +89,7 @@ class Client:
 
         self._disable_drops_bool = None
         self._auto_puzzle_bool = None
-        self._teleport_distance = 2000
+        self._teleport_distance = 0
         self._server_move_snapback_bool = None
         self._server_teleport_snapback_bool = None
         self._template_ids = None
