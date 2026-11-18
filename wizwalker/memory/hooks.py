@@ -338,15 +338,14 @@ class RenderContextHook(SimpleHook):
 
 
 class CalescentTrackerActiveHook(SimpleHook):
-    pattern = rb"\x89\x7C\x24\x34\x0F\xB6\x09\x84\xC9\x0F\x84....\x48\x8B\x05....\x48\x8B\x80...."
+    pattern = rb"\x48\x89\x4C\x24\x68\x33\xF6\x89\x74\x24.\x40\x38\x31\x0F\x84....\x48\x8B\x05....\x48\x8B\x80...."
     exports = [("tracker_active_bool", 1)]
-    instruction_length = 7
-    noops = 2
+    instruction_length = 5
+    noops = 0
 
     async def bytecode_generator(self, packed_exports):
         bytecode = (
-            b"\x89\x7C\x24\x34" # mov [rsp+34],edi (original instruction)
-            b"\x0F\xB6\x09" # movzx ecx,byte ptr [rcx] (original instruction)
+            b"\x48\x89\x4C\x24\x68" # mov [rsp+68],rcx (original instruction)
             b"\x50" # push rax
             # b"\x48\x31\xC0" # xor rax,rax
             b"\x88\xC8" # mov al,cl
@@ -358,10 +357,10 @@ class CalescentTrackerActiveHook(SimpleHook):
 
 
 class CalescentTrackerPositionHook(SimpleHook):
-    pattern = rb"\xF3\x41\x0F\x10\x44\x24\x08\xF3\x0F\x5C\x40.\xF3\x41\x0F\x10\x4C\x24."
+    pattern = rb"\xF3\x41\x0F\x10\x46\x08\xF3\x0F\x5C\x40.\xF3\x41\x0F\x10\x4E."
     exports = [("tracker_position", 12)]
-    instruction_length = 7
-    noops = 2
+    instruction_length = 6
+    noops = 1
 
     async def bytecode_generator(self, packed_exports):
         packed_z = bytearray(packed_exports[0][1])
@@ -376,7 +375,7 @@ class CalescentTrackerPositionHook(SimpleHook):
             b"\x8B\x40\x08" # mov eax,[rax+08]
             b"\xA3" + packed_z + # mov [z_pos],eax
             b"\x58" # pop rax
-            b"\xF3\x41\x0F\x10\x44\x24\x08" # movss xmm0,[r12+08] (original instruction)
+            b"\xF3\x41\x0F\x10\x46\x08" # movss xmm0,[r14+08] (original instruction)
         )
 
         return bytecode
@@ -577,8 +576,8 @@ class MovementTeleportHook(SimpleHook):
 
 
 class ServerMoveSnapbackHook(SimpleHook):
-    pattern = rb"\x4C\x8B\xC1\x48\x8B\x09\x80\x79.\x00\x74.\x4C\x3B\xC2" \
-              rb"\x74.\x66\x41\x3B\x40."
+    pattern = rb"\x4C\x8B\xC1\x48\x8B\x09\x80\x79.\x00\x74.\x45\x33\xF6" \
+              rb"\x45\x38\x70.\x75\x15"
 
     instruction_length = 6
     exports = [("server_move_snapback_bool", 1)]
