@@ -348,7 +348,7 @@ class CalescentTrackerActiveHook(SimpleHook):
             b"\x48\x89\x4C\x24\x68" # mov [rsp+68],rcx (original instruction)
             b"\x50" # push rax
             # b"\x48\x31\xC0" # xor rax,rax
-            b"\x88\xC8" # mov al,cl
+            b"\x8A\x01" # mov al,[rcx]
             b"\xA2" + packed_exports[0][1] + # mov [tracker_active_bool],al
             b"\x58" # pop rax
         )
