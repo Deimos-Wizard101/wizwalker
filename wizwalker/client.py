@@ -26,6 +26,7 @@ from .memory import (
     CurrentRootWindow,
     CurrentGameClient,
     CurrentSocialSystemsManager,
+    CurrentCalescentTrackerPosition,
     DuelPhase,
     HookHandler,
     CurrentRenderContext,
@@ -82,6 +83,7 @@ class Client:
         self.game_client = CurrentGameClient(self.hook_handler)
         self.social_systems_manager = CurrentSocialSystemsManager(self.hook_handler)
         self.chat_owner = CurrentChatOwner(self.hook_handler)
+        self.calescent_tracker_position = CurrentCalescentTrackerPosition(self.hook_handler)
 
         self._teleport_helper = TeleportHelper(self.hook_handler)
 
@@ -507,6 +509,10 @@ class Client:
 
     async def modify_teleport_distance(self, value: int):
         self._teleport_distance = value
+
+    async def is_calescent_tracker_active(self) -> bool:
+        calescent_tracker_active_bool = await self.hook_handler.read_calescent_tracker_active_bool()
+        return await self.hook_handler.read_typed(calescent_tracker_active_bool, Primitive.bool)
 
     async def teleport(
             self,

@@ -248,7 +248,7 @@ class PlayerStatHook(SimpleHook):
 
 class QuestHook(SimpleHook):
     pattern = rb"\xF3\x41\x0F\x10.\xFC\x0C\x00\x00\xF3\x0F\x11"
-    exports = [("cord_struct", 4)]
+    exports = [("cord_struct", 8)]
     noops = 4
 
     async def bytecode_generator(self, packed_exports):
@@ -333,6 +333,51 @@ class RenderContextHook(SimpleHook):
             b"\xF3\x44\x0F\x10\x8B\x98\x00\x00\x00"  # original instruction
         )
         # fmt: on
+
+        return bytecode
+
+
+class CalescentTrackerActiveHook(SimpleHook):
+    pattern = rb"\x89\x7C\x24\x34\x0F\xB6\x09\x84\xC9\x0F\x84....\x48\x8B\x05....\x48\x8B\x80...."
+    exports = [("tracker_active_bool", 1)]
+    instruction_length = 7
+    noops = 2
+
+    async def bytecode_generator(self, packed_exports):
+        bytecode = (
+            b"\x89\x7C\x24\x34" # mov [rsp+34],edi (original instruction)
+            b"\x0F\xB6\x09" # movzx ecx,byte ptr [rcx] (original instruction)
+            b"\x50" # push rax
+            # b"\x48\x31\xC0" # xor rax,rax
+            b"\x88\xC8" # mov al,cl
+            b"\xA2" + packed_exports[0][1] + # mov [tracker_active_bool],al
+            b"\x58" # pop rax
+        )
+
+        return bytecode
+
+
+class CalescentTrackerPositionHook(SimpleHook):
+    pattern = rb"\xF3\x41\x0F\x10\x44\x24\x08\xF3\x0F\x5C\x40.\xF3\x41\x0F\x10\x4C\x24."
+    exports = [("tracker_position", 12)]
+    instruction_length = 7
+    noops = 2
+
+    async def bytecode_generator(self, packed_exports):
+        packed_z = bytearray(packed_exports[0][1])
+        packed_z[0] += 8
+
+        bytecode = (
+            b"\x50" # push rax
+            b"\x48\x8B\x00" # mov rax,[rax]
+            b"\x48\xA3" + packed_exports[0][1] + # mov [xy_pos],rax
+            b"\x58" # pop rax
+            b"\x50" # push rax
+            b"\x8B\x40\x08" # mov eax,[rax+08]
+            b"\xA3" + packed_z + # mov [z_pos],eax
+            b"\x58" # pop rax
+            b"\xF3\x41\x0F\x10\x44\x24\x08" # movss xmm0,[r12+08] (original instruction)
+        )
 
         return bytecode
 

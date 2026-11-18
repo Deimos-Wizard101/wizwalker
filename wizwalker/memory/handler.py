@@ -25,6 +25,8 @@ from .hooks import (
     AhmarraAutoPuzzleHook,
     UpdateZoneCounterHook,
     ServerMoveSnapbackHook,
+    CalescentTrackerActiveHook,
+    CalescentTrackerPositionHook,
     MemoryHook
 )
 from .memory_reader import MemoryReader, Primitive
@@ -202,6 +204,8 @@ class HookHandler(MemoryReader):
         await self.activate_auto_puzzle_hook(wait_for_ready=False)
         await self.activate_update_zone_counter_hook(wait_for_ready=False)
         await self.activate_server_move_snapback_hook(wait_for_ready=False)
+        await self.activate_calescent_tracker_active_hook(wait_for_ready=False)
+        await self.activate_calescent_tracker_position_hook(wait_for_ready=False)
 
         if wait_for_ready:
             wait_tasks = []
@@ -498,6 +502,72 @@ class HookHandler(MemoryReader):
         return await self._read_hook_base_addr(
             "current_render_context", "Render context"
         )
+
+    async def activate_calescent_tracker_active_hook(
+            self, *, wait_for_ready: bool = False, timeout: float = None
+    ):
+        if self._check_if_hook_active(CalescentTrackerActiveHook):
+            raise HookAlreadyActivated("Calescent tracker active")
+
+        await self._check_for_autobot()
+
+        calescent_tracker_active_hook = CalescentTrackerActiveHook(self)
+        await calescent_tracker_active_hook.hook()
+
+        self._active_hooks[CalescentTrackerActiveHook] = calescent_tracker_active_hook
+        self._base_addrs[
+            "tracker_active_bool"
+        ] = calescent_tracker_active_hook.tracker_active_bool
+
+    async def deactivate_calescent_tracker_active_hook(self):
+        if not self._check_if_hook_active(CalescentTrackerActiveHook):
+            raise HookNotActive("Calescent tracker active")
+
+        hook = self._active_hooks.pop(CalescentTrackerActiveHook)
+        await hook.unhook()
+
+        del self._base_addrs["tracker_active_bool"]
+
+    async def read_calescent_tracker_active_bool(self):
+        addr = self._base_addrs.get("tracker_active_bool")
+
+        if addr is None:
+            raise HookNotActive(CalescentTrackerActiveHook)
+
+        return addr
+
+    async def activate_calescent_tracker_position_hook(
+            self, *, wait_for_ready: bool = False, timeout: float = None
+    ):
+        if self._check_if_hook_active(CalescentTrackerPositionHook):
+            raise HookAlreadyActivated("Calescent tracker position")
+
+        await self._check_for_autobot()
+
+        calescent_tracker_position_hook = CalescentTrackerPositionHook(self)
+        await calescent_tracker_position_hook.hook()
+
+        self._active_hooks[CalescentTrackerPositionHook] = calescent_tracker_position_hook
+        self._base_addrs[
+            "tracker_position"
+        ] = calescent_tracker_position_hook.tracker_position
+
+    async def deactivate_calescent_tracker_position_hook(self):
+        if not self._check_if_hook_active(CalescentTrackerPositionHook):
+            raise HookNotActive("Calescent tracker position")
+
+        hook = self._active_hooks.pop(CalescentTrackerPositionHook)
+        await hook.unhook()
+
+        del self._base_addrs["tracker_position"]
+
+    async def read_current_calescent_tracker_position_base(self):
+        addr = self._base_addrs.get("tracker_position")
+
+        if addr is None:
+            raise HookNotActive(CalescentTrackerPositionHook)
+
+        return addr
 
     async def activate_movement_teleport_hook(
             self, *, wait_for_ready: bool = False, timeout: float = None
