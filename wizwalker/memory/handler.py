@@ -8,7 +8,7 @@ import pymem
 import pymem.exception
 from loguru import logger
 
-from wizwalker import HookAlreadyActivated, HookNotActive, HookNotReady
+from wizwalker import HookAlreadyActivated, HookNotActive, HookNotReady, PatternFailed
 from .hooks import (
     ChatHook,
     ChatSendHook,
@@ -47,6 +47,16 @@ class HookHandler(MemoryReader):
     # rounded down
     AUTOBOT_SIZE = 3900
 
+    AUTOBOT_PATTERN_TWO = (
+        rb"\x48\x89\x5C\x24.\x48\x89\x74\x24.\x48\x89\x7C\x24."
+        rb"\x55\x41\x54\x41\x55\x41\x56\x41\x57"
+        rb"\x48\x8D\xAC\x24....\x48\x81\xEC...."
+        rb"\x48\x8B\x05....\x48\x33\xC4\x48\x89\x85...."
+        rb"\x4C\x8B\xF1.......\x80......\x0F\x84...."
+    )
+    # rounded down
+    AUTOBOT_SIZE_TWO = 4100
+
     def __init__(self, process: pymem.Pymem, client):
         super().__init__(process)
 
@@ -56,6 +66,7 @@ class HookHandler(MemoryReader):
         self._autobot_lock = None
         self._original_autobot_bytes = b""
         self._autobot_pos = 0
+        self._game_compiled_type = 0
 
         # TODO: Is this signature correct?
         self._active_hooks: dict[type, MemoryHook] = {}
@@ -65,7 +76,13 @@ class HookHandler(MemoryReader):
         self._dance_moves_transtable = str.maketrans("abcd", "WDSA")
 
     async def _get_open_autobot_address(self, size: int) -> int:
-        if self._autobot_pos + size > self.AUTOBOT_SIZE:
+        if self._game_compiled_type == 1:
+            autobot_size = self.AUTOBOT_SIZE
+
+        elif self._game_compiled_type == 2:
+            autobot_size = self.AUTOBOT_SIZE_TWO
+
+        if self._autobot_pos + size > autobot_size:
             raise RuntimeError("Somehow went over autobot size")
 
         addr = self._autobot_address + self._autobot_pos
@@ -77,11 +94,20 @@ class HookHandler(MemoryReader):
         return addr
 
     async def _get_autobot_address(self):
-        addr = await self.pattern_scan(
-            self.AUTOBOT_PATTERN, module="WizardGraphicalClient.exe"
-        )
-        if addr is None:
-            raise RuntimeError("Pattern scan failed for autobot pattern")
+        try:
+            addr = await self.pattern_scan(
+                self.AUTOBOT_PATTERN, module="WizardGraphicalClient.exe"
+            )
+            if addr is None:
+                raise RuntimeError("Pattern scan failed for autobot pattern")
+            self._game_compiled_type = 1
+        except PatternFailed:
+            addr = await self.pattern_scan(
+                self.AUTOBOT_PATTERN_TWO, module="WizardGraphicalClient.exe"
+            )
+            if addr is None:
+                raise RuntimeError("Pattern scan failed for autobot pattern")
+            self._game_compiled_type = 2
 
         self._autobot_address = addr
 
@@ -90,20 +116,37 @@ class HookHandler(MemoryReader):
         if self._autobot_address is None:
             await self._get_autobot_address()
 
-            # we only need to write back the pattern
-            self._original_autobot_bytes = await self.read_bytes(
-                self._autobot_address, len(self.AUTOBOT_PATTERN)
-            )
-            logger.debug(
-                f"Got original bytes {self._original_autobot_bytes} from autobot"
-            )
-            await self.write_bytes(self._autobot_address, b"\x00" * self.AUTOBOT_SIZE)
+            if self._game_compiled_type == 1:
+                # we only need to write back the pattern
+                self._original_autobot_bytes = await self.read_bytes(
+                    self._autobot_address, len(self.AUTOBOT_PATTERN)
+                )
+                logger.debug(
+                    f"Got original bytes {self._original_autobot_bytes} from autobot"
+                )
+                await self.write_bytes(self._autobot_address, b"\x00" * self.AUTOBOT_SIZE)
+
+            elif self._game_compiled_type == 2:
+                # we only need to write back the pattern
+                self._original_autobot_bytes = await self.read_bytes(
+                    self._autobot_address, len(self.AUTOBOT_PATTERN_TWO)
+                )
+                logger.debug(
+                    f"Got original bytes {self._original_autobot_bytes} from autobot"
+                )
+                await self.write_bytes(self._autobot_address, b"\x00" * self.AUTOBOT_SIZE_TWO)
 
     async def _rewrite_autobot(self):
         if self._autobot_address is not None:
-            compare_bytes = await self.read_bytes(
-                self._autobot_address, len(self.AUTOBOT_PATTERN)
-            )
+            if self._game_compiled_type == 1:
+                compare_bytes = await self.read_bytes(
+                    self._autobot_address, len(self.AUTOBOT_PATTERN)
+                )
+
+            elif self._game_compiled_type == 2:
+                compare_bytes = await self.read_bytes(
+                    self._autobot_address, len(self.AUTOBOT_PATTERN_TWO)
+                )
             # Give some time for execution point to leave hooks
             await asyncio.sleep(0.5)
 
