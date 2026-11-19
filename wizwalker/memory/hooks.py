@@ -863,27 +863,49 @@ class MouselessCursorMoveHook(User32GetClassInfoBaseHook):
         else:
             bool_one_address = self._get_cached("bool_one_address")
 
+        # Second toggle: the "mouse is over this window" flag (+0x190) that the game's
+        # UI input handler clears on WM_MOUSELEAVE. Patching that clear to write 1
+        # stops the game from dropping our clicks when the real cursor is elsewhere.
+        # Each entry: (pattern, offset from match start to the imm8 byte to patch).
+        bool_two_patterns = (
+            # builds before 2026-11-18: mov byte [rsi+disp32],0 ; xor edi,edi ; mov [..],edi
+            (rb"\xC6\x86...\x00\x00\x33\xFF\x89", 6),
+            # 2026-11-18 build: mov byte [r14+0x190],0 ; xor esi,esi ; mov [rbp+..],esi
+            # (do NOT loosen the old one to "...\x33\xFF": that hits MouseLookToggled
+            # and breaks clicking)
+            (rb"\x41\xC6\x86...\x00\x00\x33\xF6\x89", 7),
+        )
         bool_two_address = None
-        if not self._is_cached("bool_two_address"):
-            if a := await self.pattern_scan(
-                rb"\xC6\x86...\x00\x00\x33\xFF\x89",
-                module="WizardGraphicalClient.exe",
-            ):
-                self._cache("bool_two_address", a)
-                bool_two_address = a
+        if not self._is_cached("bool_two_toggle"):
+            from wizwalker import PatternFailed, PatternMultipleResults
+            for pattern, offset in bool_two_patterns:
+                try:
+                    a = await self.pattern_scan(pattern, module="WizardGraphicalClient.exe")
+                except (PatternFailed, PatternMultipleResults):
+                    continue
+                if a:
+                    bool_two_address = a + offset
+                    self._cache("bool_two_toggle", bool_two_address)
+                    break
+            else:
+                # keep going with only the first toggle instead of failing every click
+                logger.warning(
+                    "Mouseless: second toggle bool pattern not found; continuing without it"
+                )
         else:
-            bool_two_address = self._get_cached("bool_two_address")
+            bool_two_address = self._get_cached("bool_two_toggle")
 
-        if bool_one_address is None or bool_two_address is None:
+        if bool_one_address is None:
             raise RuntimeError("toogle bool address pattern failed")
 
-        # bool is 6 away from pattern target
-        bool_two_address += 6
+        toggle_bool_addrs = [bool_one_address]
+        if bool_two_address is not None:
+            toggle_bool_addrs.append(bool_two_address)
 
-        self.toggle_bool_addrs = (bool_one_address, bool_two_address)
+        self.toggle_bool_addrs = tuple(toggle_bool_addrs)
 
-        await self.write_bytes(bool_one_address, b"\x01")
-        await self.write_bytes(bool_two_address, b"\x01")
+        for bool_addr in self.toggle_bool_addrs:
+            await self.write_bytes(bool_addr, b"\x01")
 
         set_cursor_pos = None
         if not self._is_cached("SetCursorPos"):
