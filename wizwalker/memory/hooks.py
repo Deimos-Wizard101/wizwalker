@@ -304,15 +304,26 @@ class RootWindowHook(SimpleHook):
     exports = [("current_root_window_addr", 8)]
 
     async def bytecode_generator(self, packed_exports):
-        # fmt: off
-        bytecode = (
-            b"\x50"  # push rax
-            b"\x49\x8B\x85\xD8\x00\x00\x00"  # mov rax,[r13+D8]
-            b"\x48\xA3" + packed_exports[0][1] +  # mov [current_root_window_addr], rax
-            b"\x58"  # pop rax
-            b"\x49\x8B\x8D\xD8\x00\x00\x00"  # original instruction
-        )
-        # fmt: on
+        if self.hook_handler._game_compiled_type == 1:
+            # fmt: off
+            bytecode = (
+                b"\x50"  # push rax
+                b"\x49\x8B\x87\xD8\x00\x00\x00"  # mov rax,[r15+D8]
+                b"\x48\xA3" + packed_exports[0][1] +  # mov [current_root_window_addr], rax
+                b"\x58"  # pop rax
+                b"\x49\x8B\x8F\xD8\x00\x00\x00"  # original instruction
+            )
+            # fmt: on
+        elif self.hook_handler._game_compiled_type == 2:
+            # fmt: off
+            bytecode = (
+                b"\x50"  # push rax
+                b"\x49\x8B\x85\xD8\x00\x00\x00"  # mov rax,[r13+D8]
+                b"\x48\xA3" + packed_exports[0][1] +  # mov [current_root_window_addr], rax
+                b"\x58"  # pop rax
+                b"\x49\x8B\x8D\xD8\x00\x00\x00"  # original instruction
+            )
+            # fmt: on
 
         return bytecode
 
@@ -338,58 +349,90 @@ class RenderContextHook(SimpleHook):
 
 
 class CalescentTrackerActiveHook(SimpleHook):
-    pattern = rb"\x48\x89\x4C\x24\x68\x33\xF6\x89\x74\x24.\x40\x38\x31\x0F\x84....\x48\x8B\x05....\x48\x8B\x80...."
     exports = [("tracker_active_bool", 1)]
-    instruction_length = 5
-    noops = 0
+
+    def __init__(self, hook_handler, hook_cache = {}):
+        super().__init__(hook_handler, hook_cache)
+        if hook_handler._game_compiled_type == 1:
+            self.pattern = rb"\x89\x7C\x24\x34\x0F\xB6\x09\x84\xC9\x0F\x84....\x48\x8B\x05....\x48\x8B\x80...."
+            self.instruction_length = 7
+            self.noops = 2
+        elif hook_handler._game_compiled_type == 2:
+            self.pattern = rb"\x48\x89\x4C\x24\x68\x33\xF6\x89\x74\x24.\x40\x38\x31\x0F\x84....\x48\x8B\x05....\x48\x8B\x80...."
+            self.instruction_length = 5
+            self.noops = 0
 
     async def bytecode_generator(self, packed_exports):
-        bytecode = (
-            b"\x48\x89\x4C\x24\x68" # mov [rsp+68],rcx (original instruction)
-            b"\x50" # push rax
-            # b"\x48\x31\xC0" # xor rax,rax
-            b"\x8A\x01" # mov al,[rcx]
-            b"\xA2" + packed_exports[0][1] + # mov [tracker_active_bool],al
-            b"\x58" # pop rax
-        )
+        if self.hook_handler._game_compiled_type == 1:
+            bytecode = (
+                b"\x89\x7C\x24\x34" # mov [rsp+34],edi (original instruction)
+                b"\x0F\xB6\x09" # movzx ecx,byte ptr [rcx] (original instruction)
+                b"\x50" # push rax
+                # b"\x48\x31\xC0" # xor rax,rax
+                b"\x88\xC8" # mov al,cl
+                b"\xA2" + packed_exports[0][1] + # mov [tracker_active_bool],al
+                b"\x58" # pop rax
+            )
+        elif self.hook_handler._game_compiled_type == 2:
+            bytecode = (
+                b"\x48\x89\x4C\x24\x68" # mov [rsp+68],rcx (original instruction)
+                b"\x50" # push rax
+                # b"\x48\x31\xC0" # xor rax,rax
+                b"\x8A\x01" # mov al,[rcx]
+                b"\xA2" + packed_exports[0][1] + # mov [tracker_active_bool],al
+                b"\x58" # pop rax
+            )
 
         return bytecode
 
 
 class CalescentTrackerPositionHook(SimpleHook):
-    pattern = rb"\xF3\x41\x0F\x10\x46\x08\xF3\x0F\x5C\x40.\xF3\x41\x0F\x10\x4E."
     exports = [("tracker_position", 12)]
-    instruction_length = 6
-    noops = 1
+
+    def __init__(self, hook_handler, hook_cache = {}):
+        super().__init__(hook_handler, hook_cache)
+        if hook_handler._game_compiled_type == 1:
+            self.pattern = rb"\xF3\x41\x0F\x10\x44\x24\x08\xF3\x0F\x5C\x40.\xF3\x41\x0F\x10\x4C\x24."
+            self.instruction_length = 7
+            self.noops = 2
+        elif hook_handler._game_compiled_type == 2:
+            self.pattern = rb"\xF3\x41\x0F\x10\x46\x08\xF3\x0F\x5C\x40.\xF3\x41\x0F\x10\x4E."
+            self.instruction_length = 6
+            self.noops = 1
 
     async def bytecode_generator(self, packed_exports):
         packed_z = bytearray(packed_exports[0][1])
         packed_z[0] += 8
 
-        bytecode = (
-            b"\x50" # push rax
-            b"\x48\x8B\x00" # mov rax,[rax]
-            b"\x48\xA3" + packed_exports[0][1] + # mov [xy_pos],rax
-            b"\x58" # pop rax
-            b"\x50" # push rax
-            b"\x8B\x40\x08" # mov eax,[rax+08]
-            b"\xA3" + packed_z + # mov [z_pos],eax
-            b"\x58" # pop rax
-            b"\xF3\x41\x0F\x10\x46\x08" # movss xmm0,[r14+08] (original instruction)
-        )
+        if self.hook_handler._game_compiled_type == 1:
+            bytecode = (
+                b"\x50" # push rax
+                b"\x48\x8B\x00" # mov rax,[rax]
+                b"\x48\xA3" + packed_exports[0][1] + # mov [xy_pos],rax
+                b"\x58" # pop rax
+                b"\x50" # push rax
+                b"\x8B\x40\x08" # mov eax,[rax+08]
+                b"\xA3" + packed_z + # mov [z_pos],eax
+                b"\x58" # pop rax
+                b"\xF3\x41\x0F\x10\x44\x24\x08" # movss xmm0,[r12+08] (original instruction)
+            )
+        elif self.hook_handler._game_compiled_type == 2:
+            bytecode = (
+                b"\x50" # push rax
+                b"\x48\x8B\x00" # mov rax,[rax]
+                b"\x48\xA3" + packed_exports[0][1] + # mov [xy_pos],rax
+                b"\x58" # pop rax
+                b"\x50" # push rax
+                b"\x8B\x40\x08" # mov eax,[rax+08]
+                b"\xA3" + packed_z + # mov [z_pos],eax
+                b"\x58" # pop rax
+                b"\xF3\x41\x0F\x10\x46\x08" # movss xmm0,[r14+08] (original instruction)
+            )
 
         return bytecode
 
 
 class MovementTeleportHook(SimpleHook):
-    pattern = rb"\x57\x48\x83\xEC.\x48\x8B\x99...." \
-              rb"\x48\x85\xDB\x74.\x4C\x8B\x43.\x48\x8B\x5B"\
-              rb".\x48\x85\xDB\x74.\xF0\xFF\x43.\x4D\x85" \
-              rb"\xC0\x74.\xF2\x0F\x10\x02\xF2\x41\x0F\x11\x40" \
-              rb".\x8B\x42.\x41\x89\x40.\x41\xC6\x80."
-
-    instruction_length = 5
-    noops = 0
     # position vector = 12 + 1 for update bool + 8 for target object address
     exports = [("teleport_helper", 21)]
 
@@ -397,6 +440,25 @@ class MovementTeleportHook(SimpleHook):
     _old_collision_jes_bytes = None
     _collision_je_addrs = None
     _old_je_page_protection = None
+
+    def __init__(self, hook_handler, hook_cache = {}):
+        super().__init__(hook_handler, hook_cache)
+        if hook_handler._game_compiled_type == 1:
+            self.pattern = rb"\x40\x57\x48\x83\xEC\x30\x48\xC7\x44\x24\x20\xFE" \
+                           rb"\xFF\xFF\xFF\x48\x89\x5C\x24\x40\x48\x8B\x99\xB8" \
+                           rb"\x01\x00\x00\x48\x85\xDB\x74\x13\x4C\x8B\x43\x70" \
+                           rb"\x48\x8B\x5B\x78\x48\x85\xDB\x74\x0C\xF0\xFF\x43" \
+                           rb"\x08\xEB\x06\x45\x33\xC0\x41\x8B\xD8\x4D\x85\xC0\x74\x19"
+            self.instruction_length = 6
+            self.noops = 1
+        elif hook_handler._game_compiled_type == 2:
+            self.pattern = rb"\x57\x48\x83\xEC.\x48\x8B\x99...." \
+                           rb"\x48\x85\xDB\x74.\x4C\x8B\x43.\x48\x8B\x5B"\
+                           rb".\x48\x85\xDB\x74.\xF0\xFF\x43.\x4D\x85" \
+                           rb"\xC0\x74.\xF2\x0F\x10\x02\xF2\x41\x0F\x11\x40" \
+                           rb".\x8B\x42.\x41\x89\x40.\x41\xC6\x80."
+            self.instruction_length = 5
+            self.noops = 0
 
     def _set_page_protection(self, address: int, protections: int, size: int = 24) -> int:
         old_protection = ctypes.wintypes.DWORD()
@@ -433,15 +495,26 @@ class MovementTeleportHook(SimpleHook):
 
         target_address = jes[0]
 
-        inside_event_je_addr = await self.pattern_scan(
-            rb"\x74.\xF3\x0F\x10\x55\xA8",
-            module="WizardGraphicalClient.exe",
-        )
-        
-        event_dispatch_je_addr = await self.pattern_scan(
-            rb"\x74.\xF3\x0F\x10\x44\x24\x54\xF3\x0F",
-            module="WizardGraphicalClient.exe",
-        )
+        if self.hook_handler._game_compiled_type == 1:
+            inside_event_je_addr = await self.pattern_scan(
+                rb"\x74.\xF3\x0F\x10\x55\x90",
+                module="WizardGraphicalClient.exe",
+            )
+
+            event_dispatch_je_addr = await self.pattern_scan(
+                rb"\x74.\xF3\x0F\x10\x44\x24\x58\xF3\x0F",
+                module="WizardGraphicalClient.exe",
+            )
+        elif self.hook_handler._game_compiled_type == 2:
+            inside_event_je_addr = await self.pattern_scan(
+                rb"\x74.\xF3\x0F\x10\x55\xA8",
+                module="WizardGraphicalClient.exe",
+            )
+
+            event_dispatch_je_addr = await self.pattern_scan(
+                rb"\x74.\xF3\x0F\x10\x44\x24\x54\xF3\x0F",
+                module="WizardGraphicalClient.exe",
+            )
 
         old_inside_event_je_bytes = await self.read_bytes(inside_event_je_addr, 2)
         old_event_dispatch_je_addr = await self.read_bytes(event_dispatch_je_addr, 2)
@@ -475,38 +548,72 @@ class MovementTeleportHook(SimpleHook):
         packed_jes_and = struct.pack("<Q", jes[0])
         packed_jes_cmp = struct.pack("<Q", jes[1])
 
-        # fmt: off
-        bytecode = (
-            b"\x50"  # push rax
-            # b"\x48\x8B\x81\xA0\x01\x00\x00"  # mov rax,[rcx+1A0]
-            # b"\x48\x85\xC0"  # test rax,rax
-            b"\x48\xa1" + packed_target_addr +  # mov rax,[target_object_addr]
-            b"\x48\x39\xC1"  # cmp rcx,rax
-            b"\x58"  # pop rax
-            b"\x0F\x84\x05\x00\x00\x00"  # je down 5 (local client object)
-            b"\xE9\x6E\x00\x00\x00"  # jmp ( not local client object)
-            b"\x50"  # push rax
-            b"\xA0" + packed_should_update +  # mov al,[should_update_bool]
-            b"\x84\xC0"  # test al,al (test if should_update is True)
-            b"\x58"  # pop rax
-            b"\x0F\x85\x05\x00\x00\x00"  # jne 5 (should_update is True)
-            b"\xE9\x56\x00\x00\x00"  # jmp (should_update is False)
-            b"\x50"  # push rax
-            b"\x48\xA1" + packed_exports[0][1] +  # mov rax, [new_pos]
-            b"\x48\x89\x02"  # mov[rdx], rax
-            b"\xA1" + packed_z +  # mov eax, [7FF7E5541010]
-            b"\x89\x42\x08"  # mov[rdx+08], eax
-            b"\x48\xB8\x00\x00\x00\x00\x00\x00\x00\x00"  # mov rax,0000000000000000
-            b"\xA2" + packed_should_update +  # mov [should_update_bool],al
-            b"\x48\xB8" + jes_and_bytes +
-            b"\x48\xA3" + packed_jes_and +
-            b"\x48\xB8" + jes_cmp_bytes +
-            b"\x48\xA3" + packed_jes_cmp +
-            b"\x58" # pop rax
-            b"\x57" # push rdi (original bytes)
-            b"\x48\x83\xEC\x20" # sub rsp,20 (original bytes)
-        )
-        # fmt: on
+        if self.hook_handler._game_compiled_type == 1:
+            # fmt: off
+            bytecode = (
+                b"\x50"  # push rax
+                # b"\x48\x8B\x81\xA0\x01\x00\x00"  # mov rax,[rcx+1A0]
+                # b"\x48\x85\xC0"  # test rax,rax
+                b"\x48\xa1" + packed_target_addr +  # mov rax,[target_object_addr]
+                b"\x48\x39\xC1"  # cmp rcx,rax
+                b"\x58"  # pop rax
+                b"\x0F\x84\x05\x00\x00\x00"  # je down 5 (local client object)
+                b"\xE9\x6E\x00\x00\x00"  # jmp ( not local client object)
+                b"\x50"  # push rax
+                b"\xA0" + packed_should_update +  # mov al,[should_update_bool]
+                b"\x84\xC0"  # test al,al (test if should_update is True)
+                b"\x58"  # pop rax
+                b"\x0F\x85\x05\x00\x00\x00"  # jne 5 (should_update is True)
+                b"\xE9\x56\x00\x00\x00"  # jmp (should_update is False)
+                b"\x50"  # push rax
+                b"\x48\xA1" + packed_exports[0][1] +  # mov rax, [new_pos]
+                b"\x48\x89\x02"  # mov[rdx], rax
+                b"\xA1" + packed_z +  # mov eax, [7FF7E5541010]
+                b"\x89\x42\x08"  # mov[rdx+08], eax
+                b"\x48\xB8\x00\x00\x00\x00\x00\x00\x00\x00"  # mov rax,0000000000000000
+                b"\xA2" + packed_should_update +  # mov [should_update_bool],al
+                b"\x48\xB8" + jes_and_bytes +
+                b"\x48\xA3" + packed_jes_and +
+                b"\x48\xB8" + jes_cmp_bytes +
+                b"\x48\xA3" + packed_jes_cmp +
+                b"\x58" # pop rax
+                b"\x40\x57" # push rdi (original bytes)
+                b"\x48\x83\xEC\x30" # sub rsp,30 (original bytes)
+            )
+            # fmt: on
+        elif self.hook_handler._game_compiled_type == 2:
+            # fmt: off
+            bytecode = (
+                b"\x50"  # push rax
+                # b"\x48\x8B\x81\xA0\x01\x00\x00"  # mov rax,[rcx+1A0]
+                # b"\x48\x85\xC0"  # test rax,rax
+                b"\x48\xa1" + packed_target_addr +  # mov rax,[target_object_addr]
+                b"\x48\x39\xC1"  # cmp rcx,rax
+                b"\x58"  # pop rax
+                b"\x0F\x84\x05\x00\x00\x00"  # je down 5 (local client object)
+                b"\xE9\x6E\x00\x00\x00"  # jmp ( not local client object)
+                b"\x50"  # push rax
+                b"\xA0" + packed_should_update +  # mov al,[should_update_bool]
+                b"\x84\xC0"  # test al,al (test if should_update is True)
+                b"\x58"  # pop rax
+                b"\x0F\x85\x05\x00\x00\x00"  # jne 5 (should_update is True)
+                b"\xE9\x56\x00\x00\x00"  # jmp (should_update is False)
+                b"\x50"  # push rax
+                b"\x48\xA1" + packed_exports[0][1] +  # mov rax, [new_pos]
+                b"\x48\x89\x02"  # mov[rdx], rax
+                b"\xA1" + packed_z +  # mov eax, [7FF7E5541010]
+                b"\x89\x42\x08"  # mov[rdx+08], eax
+                b"\x48\xB8\x00\x00\x00\x00\x00\x00\x00\x00"  # mov rax,0000000000000000
+                b"\xA2" + packed_should_update +  # mov [should_update_bool],al
+                b"\x48\xB8" + jes_and_bytes +
+                b"\x48\xA3" + packed_jes_and +
+                b"\x48\xB8" + jes_cmp_bytes +
+                b"\x48\xA3" + packed_jes_cmp +
+                b"\x58" # pop rax
+                b"\x57" # push rdi (original bytes)
+                b"\x48\x83\xEC\x20" # sub rsp,20 (original bytes)
+            )
+            # fmt: on
 
         return bytecode
 
@@ -576,29 +683,78 @@ class MovementTeleportHook(SimpleHook):
 
 
 class ServerMoveSnapbackHook(SimpleHook):
-    pattern = rb"\x4C\x8B\xC1\x48\x8B\x09\x80\x79.\x00\x74.\x45\x33\xF6" \
-              rb"\x45\x38\x70.\x75\x15"
-
     instruction_length = 6
     exports = [("server_move_snapback_bool", 1)]
     noops = 1
 
+    def __init__(self, hook_handler, hook_cache = {}):
+        super().__init__(hook_handler, hook_cache)
+        if hook_handler._game_compiled_type == 1:
+            self.pattern = rb"\x4C\x8B\xC1\x48\x8B\x09\x80\x79.\x00\x74.\x4C\x3B\xC2" \
+                           rb"\x74.\x66\x41\x3B\x40."
+        elif hook_handler._game_compiled_type == 2:
+            self.pattern = rb"\x4C\x8B\xC1\x48\x8B\x09\x80\x79.\x00\x74.\x45\x33\xF6" \
+                           rb"\x45\x38\x70.\x75\x15"
+
     async def bytecode_generator(self, packed_exports):
-        return (
+        bytecode = (
             b"\x50" # push rax
             b"\x8B\x83\xA8\x13\x02\x00" # mov eax,[rbx+000213a8]
             b"\x3B\x41\x28" # cmp eax,[rcx+28]
             b"\x58" # pop rax
-            b"\x0F\x85\x17\x00\x00\x00" # jne 23
+            b"\x0F\x85\x1C\x00\x00\x00" # jne 28
             b"\x66\x39\x41\x20" # cmp [rcx+20],ax
-            b"\x0F\x85\x0D\x00\x00\x00" # jne 13
+            b"\x0F\x85\x12\x00\x00\x00" # jne 18
             b"\x50" # push rax
             b"\xB0\x01" # mov al,0x1
             b"\xA2" + packed_exports[0][1] + # mov [server_move_snapback_bool],al
             b"\x58" # pop rax
+            b"\xE9\x0B\x00\x00\x00" # jmp down 11 (needs to be +5 to account for extra return jump)
             b"\x4C\x8B\xC1" # mov r8,rcx (original bytes)
             b"\x48\x8B\x09" # mov rcx,[rcx] (original bytes)
         )
+
+        return bytecode
+
+    async def get_hook_bytecode(self) -> bytes:
+        packed_exports = []
+        for export in self.exports:
+            # addr = self.alloc(export[1])
+            addr = self.hook_handler.process.allocate(export[1])
+            setattr(self, export[0], addr)
+            packed_addr = struct.pack("<Q", addr)
+            packed_exports.append((export[0], packed_addr))
+
+        bytecode = await self.bytecode_generator(packed_exports)
+
+        return_addr = self.jump_address + self.instruction_length
+
+        relitive_return_jump = return_addr - (self.hook_address + len(bytecode)) - 5
+        packed_relitive_return_jump = struct.pack("<i", relitive_return_jump)
+
+        bytecode += b"\xE9" + packed_relitive_return_jump
+
+        if self.hook_handler._game_compiled_type == 1:
+            end_function_cleanup_offset = 4
+            end_function_cleanup_addr = await self.pattern_scan(
+                rb"\xFF\x50.\x90\x33\xC0\x4C\x8D\x5C\x24.\x49\x8B\x5B.\x49\x8B\x6B.\x49\x8B\x73." \
+                rb"\x0F\x28\x74\x24.\x49\x8B\xE3\x41\x5F\x41\x5E\x5F\xC3",
+                module="WizardGraphicalClient.exe",
+            )
+            end_function_cleanup_addr += end_function_cleanup_offset
+        elif self.hook_handler._game_compiled_type == 2:
+            end_function_cleanup_addr = await self.pattern_scan(
+                rb"\x33\xC0\x48\x8B\x5C\x24.\x48\x8B\x6C\x24.\x48\x8B\x74\x24." \
+                rb"\x0F\x28\x74\x24.\x48\x83\xC4.\x41\x5F\x41\x5E\x5F\xC3",
+                module="WizardGraphicalClient.exe",
+            )
+
+        relitive_return_jump = end_function_cleanup_addr - (self.hook_address + len(bytecode)) - 5
+        packed_relitive_return_jump = struct.pack("<i", relitive_return_jump)
+
+        bytecode += b"\xE9" + packed_relitive_return_jump
+
+        return bytecode
 
     async def hook(self):
         """
@@ -635,25 +791,51 @@ class ServerMoveSnapbackHook(SimpleHook):
 
 
 class DropsToggleHook(SimpleHook):
-    pattern = rb"\x4C\x8B\xDC\x48\x83\xEC\x68\x48\x8B\x05...." \
-              rb"\x48\x33\xC4\x48\x89\x44\x24.\x48\x8D\x05...."
-
-    instruction_length = 7
     exports = [("disable_drops_bool", 1)]
-    noops = 2
+
+    def __init__(self, hook_handler, hook_cache = {}):
+        super().__init__(hook_handler, hook_cache)
+        if hook_handler._game_compiled_type == 1:
+            self.pattern = rb"\x48\x83\xEC\x68\x48\xC7\x44\x24\x30\xFE\xFF\xFF\xFF" \
+                           rb"\x48\x8B\x05....\x48\x33\xC4\x48\x89\x44\x24." \
+                           rb"\x48\x8D\x05....\x48\x89\x44\x24.\x48\x89\x54\x24." \
+                           rb"\x66\x0F\x6F\x05....\xF3\x0F\x7F\x44\x24.\xC6\x44\x24.." \
+                           rb"\x41\xB8\x04\x00\x00\x00"
+            self.instruction_length = 13
+            self.noops = 8
+        elif hook_handler._game_compiled_type == 2:
+            self.pattern = rb"\x4C\x8B\xDC\x48\x83\xEC\x68\x48\x8B\x05...." \
+                           rb"\x48\x33\xC4\x48\x89\x44\x24.\x48\x8D\x05...."
+            self.instruction_length = 7
+            self.noops = 2
 
     async def bytecode_generator(self, packed_exports):
-        return (
-            b"\x50" # push rax
-            b"\xA0" + packed_exports[0][1] + # mov al,[disable_drops_bool]
-            b"\x84\xC0" # test al,al
-            b"\x58" # pop rax
-            b"\x0F\x84\x04\x00\x00\x00" # je down 4
-            b"\x48\x31\xC0" # xor rax,rax
-            b"\xC3" # ret
-            b"\x4C\x8B\xDC" # mov r11,rsp (original bytes)
-            b"\x48\x83\xEC\x68" # sub rsp,68 (original bytes)
-        )
+        if self.hook_handler._game_compiled_type == 1:
+            bytecode = (
+                b"\x50" # push rax
+                b"\xA0" + packed_exports[0][1] + # mov al,[disable_drops_bool]
+                b"\x84\xC0" # test al,al
+                b"\x58" # pop rax
+                b"\x0F\x84\x04\x00\x00\x00" # je down 4
+                b"\x48\x31\xC0" # xor rax,rax
+                b"\xC3" # ret
+                b"\x48\x83\xEC\x68" # sub rsp,68 (original bytes)
+                b"\x48\xC7\x44\x24\x30\xFE\xFF\xFF\xFF" # mov qword ptr [rsp+30],FFFFFFFFFFFFFFFE (original bytes)
+            )
+        elif self.hook_handler._game_compiled_type == 2:
+            bytecode = (
+                b"\x50" # push rax
+                b"\xA0" + packed_exports[0][1] + # mov al,[disable_drops_bool]
+                b"\x84\xC0" # test al,al
+                b"\x58" # pop rax
+                b"\x0F\x84\x04\x00\x00\x00" # je down 4
+                b"\x48\x31\xC0" # xor rax,rax
+                b"\xC3" # ret
+                b"\x4C\x8B\xDC" # mov r11,rsp (original bytes)
+                b"\x48\x83\xEC\x68" # sub rsp,68 (original bytes)
+            )
+
+        return bytecode
 
 
 class AhmarraAutoPuzzleHook(SimpleHook):
@@ -792,19 +974,36 @@ class User32GetClassInfoBaseHook(AutoBotBaseHook):
 
 # Thanks to peechez for this class
 class DanceGameMovesHook(SimpleHook):
-    pattern = rb"\x48\x8B\xD8\x48\x39\x70\x10\x76.\x8B\xC6"
     instruction_length = 7
     exports = [("dance_game_moves", 8)]
     noops = 2
 
+    def __init__(self, hook_handler, hook_cache = {}):
+        super().__init__(hook_handler, hook_cache)
+        if hook_handler._game_compiled_type == 1:
+            self.pattern = rb"\x48\x8B\xF8\x48\x39\x70\x10"
+        elif hook_handler._game_compiled_type == 2:
+            self.pattern = rb"\x48\x8B\xD8\x48\x39\x70\x10\x76.\x8B\xC6"
+
     async def bytecode_generator(self, packed_exports):
-        return (
-                b"\x48\x8B\xD8"
-                b"\x48\x8B\x00"
-                b"\x48\xA3" + packed_exports[0][1] +
-                b"\x48\x8B\xC3"
-                b"\x48\x39\x70\x10"
-        )
+        if self.hook_handler._game_compiled_type == 1:
+            bytecode = (
+                    b"\x48\x8B\xF8"
+                    b"\x48\x8B\x00"
+                    b"\x48\xA3" + packed_exports[0][1] +
+                    b"\x48\x8B\xC7"
+                    b"\x48\x39\x70\x10"
+            )
+        elif self.hook_handler._game_compiled_type == 2:
+            bytecode = (
+                    b"\x48\x8B\xD8"
+                    b"\x48\x8B\x00"
+                    b"\x48\xA3" + packed_exports[0][1] +
+                    b"\x48\x8B\xC3"
+                    b"\x48\x39\x70\x10"
+            )
+
+        return bytecode
 
 
 class MouselessCursorMoveHook(User32GetClassInfoBaseHook):
@@ -862,7 +1061,7 @@ class MouselessCursorMoveHook(User32GetClassInfoBaseHook):
         bool_two_address = None
         if not self._is_cached("bool_two_address"):
             if a := await self.pattern_scan(
-                rb"\xC6\x86...\x00\x00\x33\xFF\x89",
+                rb"\xC6\x86...\x00\x00\x33\xF6\x89",
                 module="WizardGraphicalClient.exe",
             ):
                 self._cache("bool_two_address", a)

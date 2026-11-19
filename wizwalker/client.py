@@ -89,7 +89,8 @@ class Client:
 
         self._disable_drops_bool = None
         self._auto_puzzle_bool = None
-        self._teleport_distance = 0
+        self._teleport_distance = 4000
+        self._currently_teleporting = False
         self._server_move_snapback_bool = None
         self._server_teleport_snapback_bool = None
         self._template_ids = None
@@ -537,6 +538,11 @@ class Client:
             purge_on_after_unuser_fixer: If should wait for inuse flag after and reset if not set
             purge_on_after_unuser_fixer_timeout: Time to wait for inuse flag to reset if not set
         """
+        if self._currently_teleporting:
+            return
+
+        self._currently_teleporting = True
+
         client_object_addr = await self.client_object.read_base_address()
 
         player_is_mounted = False
@@ -565,8 +571,10 @@ class Client:
         distance_from_final = math.dist((xyz.x, xyz.y), (current_xyz.x, current_xyz.y))
 
         teleport_distance = (1.4 * self._teleport_distance) if player_is_mounted else self._teleport_distance
+        teleport_distance_on_fail = int(teleport_distance * 0.5)
+        teleport_distance_snapback_unlikely = 2800 if player_is_mounted else 2000
 
-        if teleport_distance == 0 or distance_from_final <= teleport_distance:
+        if teleport_distance == 0 or distance_from_final <= teleport_distance_snapback_unlikely:
             await self._teleport_object(
                 client_object_addr,
                 xyz,
@@ -579,15 +587,23 @@ class Client:
             if yaw is not None:
                 await self.body.write_yaw(yaw)
 
+            self._currently_teleporting = False
+
             return
 
         angle = math.atan2(xyz.y - current_xyz.y, xyz.x - current_xyz.x)
+        current_teleport_distance = teleport_distance
+        fail_counter = 0
 
         await self.reset_server_move_snapback()
 
         while distance_from_final > teleport_distance:
-            step_x = current_xyz.x + (teleport_distance * math.cos(angle))
-            step_y = current_xyz.y + (teleport_distance * math.sin(angle))
+            if fail_counter >= 5:
+                await asyncio.sleep(1)
+                fail_counter = 0
+
+            step_x = current_xyz.x + (current_teleport_distance * math.cos(angle))
+            step_y = current_xyz.y + (current_teleport_distance * math.sin(angle))
 
             new_xyz = XYZ(step_x, step_y, -131068) # 32769
             #print(new_xyz)
@@ -606,18 +622,28 @@ class Client:
                     self.is_server_move_snapbacked,
                     value=True,
                     sleep_time=0.01,
-                    timeout=0.3,
+                    timeout=0.5,
                 )
 
-                await asyncio.sleep(0.2)
+                await asyncio.sleep(0.3)
+                current_teleport_distance = teleport_distance_on_fail
+                fail_counter += 1
+                continue
             except ExceptionalTimeout:
-                pass
+                current_teleport_distance = teleport_distance
+                fail_counter = 0
 
             current_xyz = await self.client_object.location() if pet_mode else await self.body.position()
 
             distance_from_final = math.dist((xyz.x, xyz.y), (current_xyz.x, current_xyz.y))
 
+        fail_counter = 0
+
         while True:
+            if fail_counter >= 5:
+                await asyncio.sleep(1)
+                fail_counter = 0
+
             await self._teleport_object(
                 client_object_addr,
                 xyz,
@@ -632,15 +658,18 @@ class Client:
                     self.is_server_move_snapbacked,
                     value=True,
                     sleep_time=0.01,
-                    timeout=0.3,
+                    timeout=0.5,
                 )
 
-                await asyncio.sleep(0.2)
+                await asyncio.sleep(0.3)
+                fail_counter += 1
             except ExceptionalTimeout:
                 break
 
         if yaw is not None:
             await self.body.write_yaw(yaw)
+
+        self._currently_teleporting = False
 
     async def _teleport_object(
             self,
@@ -661,6 +690,7 @@ class Client:
             await maybe_wait_for_value_with_timeout(
                 self._teleport_helper.should_update,
                 value=False,
+                sleep_time=0.01,
                 timeout=wait_on_inuse_timeout,
             )
 
@@ -678,6 +708,7 @@ class Client:
                 await maybe_wait_for_value_with_timeout(
                     self._teleport_helper.should_update,
                     value=False,
+                    sleep_time=0.01,
                     timeout=purge_on_after_unuser_fixer_timeout,
                 )
             except ExceptionalTimeout:
