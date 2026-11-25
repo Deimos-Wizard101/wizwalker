@@ -126,7 +126,7 @@ class Window(PropertyClass):
             if type_name != "SpellCheckBox":
                 raise ValueError(f"This object is a {type_name} not a SpellCheckBox.")
 
-        addr = await self.read_value_from_offset(1104, Primitive.int64)
+        addr = await self.read_value_from_offset(1112, Primitive.int64)
 
         if addr == 0:
             return None
@@ -144,7 +144,7 @@ class Window(PropertyClass):
             if type_name != "SpellCheckBox":
                 raise ValueError(f"This object is a {type_name} not a SpellCheckBox")
 
-        return await self.read_value_from_offset(1208, Primitive.bool)
+        return await self.read_value_from_offset(1216, Primitive.bool)
 
     # See maybe_graphical_spell
     async def maybe_combat_participant(self, *, check_type: bool = False) -> Optional[DynamicCombatParticipant]:
